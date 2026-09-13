@@ -29,32 +29,32 @@
 - [x] Tạo `README.md`
 - [x] Cấu hình toàn bộ dependency Maven
 - [x] Maven `install` lại sau khi thêm dependency
-- [ ] Invite đầy đủ thành viên vào GitHub repository
-- [ ] Thiết lập branch / Pull Request workflow
-- [ ] Liên kết Jira task với GitHub branch/commit/PR
+- [x] Invite đầy đủ thành viên vào GitHub repository
+- [x] Thiết lập branch / Pull Request workflow
+- [x] Liên kết Jira task với GitHub branch/commit/PR
 
 ---
 
 # Phase 2 - Common Protocol Foundation
 
-- [ ] Thiết kế `MessageType`
-- [ ] Thiết kế `MessageEnvelope`
-- [ ] Thiết kế `ErrorPayload`
-- [ ] Chuẩn hóa `requestId`
-- [ ] Chuẩn hóa `sessionId`
-- [ ] Chuẩn hóa response success/error
-- [ ] Chuẩn hóa DTO theo feature
-- [ ] Chuẩn hóa JSON serialization/deserialization
-- [ ] Viết test cho protocol common
+- [x] Thiết kế `MessageType`
+- [x] Thiết kế `MessageEnvelope`
+- [x] Thiết kế `ErrorPayload`
+- [x] Chuẩn hóa `requestId`
+- [x] Chuẩn hóa `sessionId`
+- [x] Chuẩn hóa response success/error
+- [x] Chuẩn hóa DTO theo feature
+- [x] Chuẩn hóa JSON serialization/deserialization
+- [x] Viết test cho protocol common
 
 ---
 
 # Phase 3 - TCP Networking Foundation
 
-- [ ] Xây dựng TCP framing protocol
-- [ ] Xây dựng `FrameReader`
-- [ ] Xây dựng `FrameWriter`
-- [ ] Áp dụng giới hạn frame 64 KB
+- [x] Xây dựng TCP framing protocol
+- [x] Xây dựng `FrameReader`
+- [x] Xây dựng `FrameWriter`
+- [x] Áp dụng giới hạn frame 64 KB
 - [ ] Xây dựng TCP Server cơ bản
 - [ ] Xây dựng `ClientHandler`
 - [ ] Xây dựng thread pool cho nhiều Client
@@ -62,7 +62,7 @@
 - [ ] Xây dựng background listener phía Client
 - [ ] Hoàn thiện PING/PONG smoke test
 - [ ] Test nhiều Client kết nối đồng thời
-- [ ] Test malformed JSON / invalid frame
+- [x] Test malformed JSON / invalid frame
 - [ ] Test disconnect đột ngột
 
 ---
@@ -129,16 +129,16 @@
 
 # Phase 8 - Game Domain Model
 
-- [ ] Chuẩn hóa `PlayerColor`
-- [ ] Chuẩn hóa `PieceState`
-- [ ] Chuẩn hóa `PlayerPresenceState`
-- [ ] Chuẩn hóa `MatchParticipantStatus`
-- [ ] Chuẩn hóa `TurnState`
-- [ ] Chuẩn hóa `Piece`
-- [ ] Chuẩn hóa `GameState`
-- [ ] Chuẩn hóa board coordinate model
-- [ ] Unit test Local Step / Global Ring
-- [ ] Unit test Finish Track coordinate
+- [x] Chuẩn hóa `PieceColor`
+- [x] Chuẩn hóa `PieceState`
+- [x] Chuẩn hóa `PlayerPresenceState`
+- [x] Chuẩn hóa `MatchParticipantStatus`
+- [x] Chuẩn hóa `TurnState`
+- [x] Chuẩn hóa `Piece`
+- [x] Chuẩn hóa `GameState`
+- [x] Chuẩn hóa board coordinate model
+- [x] Unit test Local Step / Global Ring
+- [x] Unit test Finish Track coordinate
 
 ---
 
@@ -164,7 +164,7 @@
 # Phase 10 - Special Cells
 
 - [ ] Special Cell placement
-- [ ] Special Cell blacklist
+- [x] Special Cell blacklist
 - [ ] Speed Cell
 - [ ] Slow Cell
 - [ ] Lucky Cell
