@@ -164,8 +164,8 @@ Jira Task
 ## Tài liệu dự án
 
 - [`AGENTS.md`](./AGENTS.md): đặc tả kỹ thuật và luật dành cho developer / AI coding agent.
-- [`PLAN.md`](./PROJECT_PLAN.md): checklist tiến độ kỹ thuật toàn dự án.
-- `README.md`: giới thiệu nhanh repository, kiến trúc và cách làm việc.
+- [`PLAN.md`](./PLAN.md): checklist tiến độ kỹ thuật toàn dự án.
+- [`README.md`](./README.md): giới thiệu nhanh repository, kiến trúc và cách làm việc.
 
 ## Thành viên
 
