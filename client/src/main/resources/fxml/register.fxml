@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Hyperlink?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.PasswordField?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="vn.ptit.ltm.client.controller.RegisterController"
+            styleClass="app-background">
+    <left>
+        <VBox alignment="CENTER_LEFT" prefWidth="410.0" spacing="18.0" styleClass="brand-panel">
+            <padding>
+                <Insets bottom="64.0" left="56.0" right="56.0" top="64.0"/>
+            </padding>
+            <Label styleClass="brand-kicker" text="PTIT • LẬP TRÌNH MẠNG"/>
+            <Label maxWidth="310.0" styleClass="brand-title" text="Gia nhập bàn chơi" wrapText="true"/>
+            <Label maxWidth="300.0" styleClass="brand-copy"
+                   text="Tạo tài khoản để thi đấu, tích điểm và theo dõi thành tích của bạn."
+                   wrapText="true"/>
+            <Region VBox.vgrow="ALWAYS"/>
+            <Label styleClass="brand-footnote" text="2–4 NGƯỜI CHƠI • 1 NGƯỜI CHIẾN THẮNG"/>
+        </VBox>
+    </left>
+    <center>
+        <VBox alignment="CENTER" styleClass="content-panel">
+            <VBox maxWidth="390.0" spacing="10.0" styleClass="auth-card">
+                <Label styleClass="eyebrow" text="TÀI KHOẢN MỚI"/>
+                <Label styleClass="screen-title" text="Đăng ký"/>
+
+                <Label styleClass="field-label" text="Tên đăng nhập"/>
+                <TextField fx:id="usernameField" promptText="Tối đa 50 ký tự"/>
+                <Label styleClass="field-label" text="Tên hiển thị"/>
+                <TextField fx:id="displayNameField" promptText="Tên xuất hiện trong game"/>
+                <Label styleClass="field-label" text="Mật khẩu"/>
+                <PasswordField fx:id="passwordField" promptText="Tối đa 72 byte UTF-8"/>
+                <Label styleClass="field-label" text="Xác nhận mật khẩu"/>
+                <PasswordField fx:id="confirmPasswordField" onAction="#handleRegister" promptText="Nhập lại mật khẩu"/>
+
+                <Label fx:id="feedbackLabel" minHeight="22.0" wrapText="true"/>
+                <Button fx:id="registerButton" defaultButton="true" maxWidth="Infinity" onAction="#handleRegister"
+                        styleClass="primary-button" text="Tạo tài khoản"/>
+                <Button fx:id="retryButton" managed="false" maxWidth="Infinity" onAction="#retryConnection"
+                        styleClass="secondary-button" text="Kết nối lại" visible="false"/>
+
+                <HBox alignment="CENTER" spacing="4.0">
+                    <Label text="Đã có tài khoản?"/>
+                    <Hyperlink onAction="#showLogin" text="Quay lại đăng nhập"/>
+                </HBox>
+                <Label fx:id="connectionLabel" alignment="CENTER" maxWidth="Infinity" styleClass="connection-offline"/>
+            </VBox>
+        </VBox>
+    </center>
+</BorderPane>

@@ -18,6 +18,7 @@
 - [x] Tạo module `common`
 - [x] Tạo module `server`
 - [x] Tạo module `client`
+- [x] Thiết lập GitHub Actions CI cho toàn bộ Maven reactor và MySQL integration test
 - [x] Cấu hình dependency giữa các module
 - [x] Maven reactor build thành công
 - [x] Tạo package structure ban đầu
@@ -29,6 +30,7 @@
 - [x] Tạo `README.md`
 - [x] Cấu hình toàn bộ dependency Maven
 - [x] Maven `install` lại sau khi thêm dependency
+- [x] Bổ sung Maven Wrapper để build không phụ thuộc Maven cài toàn hệ thống
 - [x] Invite đầy đủ thành viên vào GitHub repository
 - [x] Thiết lập branch / Pull Request workflow
 - [x] Liên kết Jira task với GitHub branch/commit/PR
@@ -55,57 +57,57 @@
 - [x] Xây dựng `FrameReader`
 - [x] Xây dựng `FrameWriter`
 - [x] Áp dụng giới hạn frame 64 KB
-- [ ] Xây dựng TCP Server cơ bản
-- [ ] Xây dựng `ClientHandler`
-- [ ] Xây dựng thread pool cho nhiều Client
-- [ ] Xây dựng TCP Client cơ bản
-- [ ] Xây dựng background listener phía Client
-- [ ] Hoàn thiện PING/PONG smoke test
-- [ ] Test nhiều Client kết nối đồng thời
+- [x] Xây dựng TCP Server cơ bản
+- [x] Xây dựng `ClientHandler`
+- [x] Xây dựng thread pool cho nhiều Client
+- [x] Xây dựng TCP Client cơ bản
+- [x] Xây dựng background listener phía Client
+- [x] Hoàn thiện PING/PONG smoke test
+- [x] Test nhiều Client kết nối đồng thời
 - [x] Test malformed JSON / invalid frame
-- [ ] Test disconnect đột ngột
+- [x] Test disconnect đột ngột
 
 ---
 
 # Phase 4 - Authentication & Session
 
-- [ ] Register end-to-end
-- [ ] Login end-to-end
-- [ ] Logout end-to-end
-- [ ] Session creation
-- [ ] Một account chỉ có một active session
-- [ ] Session cleanup
-- [ ] Heartbeat
-- [ ] Detect disconnect
-- [ ] Reconnect trong grace period
-- [ ] Session restore sau reconnect
+- [x] Register end-to-end
+- [x] Login end-to-end
+- [x] Logout end-to-end
+- [x] Session creation
+- [x] Một account chỉ có một active session
+- [x] Session cleanup
+- [x] Heartbeat
+- [x] Detect disconnect
+- [x] Reconnect trong grace period
+- [x] Session restore sau reconnect
 
 ---
 
 # Phase 5 - Database Foundation
 
-- [ ] Tạo database `ludo_game`
-- [ ] Cấu hình JDBC
-- [ ] Cấu hình HikariCP
-- [ ] Cấu hình Flyway
-- [ ] Migration bảng `users`
-- [ ] Migration bảng `matches`
-- [ ] Migration bảng `match_players`
-- [ ] Hoàn thiện repository layer cơ bản
-- [ ] Kiểm thử migration từ database rỗng
+- [x] Tạo database `ludo_game`
+- [x] Cấu hình JDBC
+- [x] Cấu hình HikariCP
+- [x] Cấu hình Flyway
+- [x] Migration bảng `users`
+- [x] Migration bảng `matches`
+- [x] Migration bảng `match_players`
+- [x] Hoàn thiện repository layer cơ bản
+- [x] Kiểm thử migration từ database rỗng
 
 ---
 
 # Phase 6 - Lobby
 
-- [ ] Online Player List end-to-end
-- [ ] Player Presence end-to-end
-- [ ] Đồng bộ trạng thái `IDLE`
-- [ ] Đồng bộ trạng thái `IN_ROOM`
-- [ ] Đồng bộ trạng thái `PLAYING`
-- [ ] Broadcast Lobby State
-- [ ] Hiển thị điểm người chơi
-- [ ] Hiển thị số lần hạng nhất
+- [x] Online Player List end-to-end
+- [x] Player Presence end-to-end
+- [x] Đồng bộ trạng thái `IDLE`
+- [x] Đồng bộ trạng thái `IN_ROOM`
+- [x] Đồng bộ trạng thái `PLAYING`
+- [x] Broadcast Lobby State
+- [x] Hiển thị điểm người chơi
+- [x] Hiển thị số lần hạng nhất
 
 ---
 
@@ -209,11 +211,11 @@
 
 # Phase 13 - JavaFX Client
 
-- [ ] JavaFX bootstrap
-- [ ] FXML loading
-- [ ] CSS foundation
-- [ ] Login Screen
-- [ ] Register Screen
+- [x] JavaFX bootstrap
+- [x] FXML loading
+- [x] CSS foundation
+- [x] Login Screen
+- [x] Register Screen
 - [ ] Lobby Screen
 - [ ] Room Screen
 - [ ] Game Board Screen
@@ -228,7 +230,7 @@
 - [ ] Render Turn Indicator
 - [ ] Render Countdown
 - [ ] Render Special Cells
-- [ ] Network thread không block JavaFX Application Thread
+- [x] Network thread không block JavaFX Application Thread
 
 ---
 
@@ -361,7 +363,6 @@ Một task lớn chỉ được đánh `[x]` khi:
 
 Hiện tại ưu tiên:
 
-1. Hoàn thiện Maven dependencies.
-2. Hoàn thiện Common Protocol Foundation.
-3. Hoàn thiện TCP Networking Foundation.
-4. Sau đó mở các vertical slice task để 4 thành viên làm song song.
+1. Xây dựng Room Management trên Lobby State và broadcast contract đã chốt.
+2. Hoàn thiện Lobby Screen và nối `ONLINE_PLAYERS_UPDATED` vào JavaFX state.
+3. Bổ sung reconnect phía JavaFX trên session đã lưu trong RAM.
