@@ -43,7 +43,7 @@ Server là **nguồn sự thật duy nhất** của trận đấu:
 ```text
 ludo-game/
 ├── AGENTS.md
-├── PROJECT_PLAN.md
+├── PLAN.md
 ├── pom.xml
 ├── common/
 ├── server/
@@ -112,6 +112,18 @@ Chi tiết đầy đủ xem [`AGENTS.md`](./AGENTS.md).
 
 Project sử dụng Maven multi-module.
 
+Build toàn bộ project bằng Maven Wrapper (không cần cài Maven riêng):
+
+```powershell
+.\mvnw.cmd install
+```
+
+Trên Linux/macOS:
+
+```bash
+./mvnw install
+```
+
 Trong IntelliJ IDEA có thể chạy:
 
 ```text
@@ -128,6 +140,103 @@ client ....... SUCCESS
 
 BUILD SUCCESS
 ```
+
+## Continuous Integration
+
+Workflow [CI](./.github/workflows/ci.yml) tự động chạy trên mọi `push`, `pull_request` và có thể chạy thủ công bằng `workflow_dispatch`.
+
+CI thực hiện:
+
+- checkout source với quyền chỉ đọc;
+- cài Eclipse Temurin JDK 21 và cache Maven dependencies;
+- khởi tạo MySQL 8.4 service có health check;
+- bật toàn bộ MySQL integration test;
+- chạy `./mvnw --batch-mode --no-transfer-progress verify` cho cả `common`, `server` và `client`.
+
+Các mật khẩu trong workflow chỉ là credential tạm thời của MySQL service trong runner, không dùng GitHub secret và không dùng cho môi trường triển khai.
+
+## Chạy MySQL bằng Docker Compose
+
+Yêu cầu Docker Desktop (hoặc Docker Engine có Compose plugin). Từ thư mục gốc dự án, chạy:
+
+```bash
+docker compose up -d mysql
+docker compose ps
+```
+
+Compose khởi tạo database `ludo_game` và lưu dữ liệu trong named volume `mysql_data`. Cấu hình JDBC mặc định cho Game Server chạy trên máy host:
+
+```text
+URL:      jdbc:mysql://localhost:3306/ludo_game
+User:     ludo
+Password: ludo_dev_password
+```
+
+Các giá trị trên chỉ dành cho môi trường local. Khi cần thay đổi, sao chép `.env.example` thành `.env` và sửa giá trị trong `.env`; file này đã được Git bỏ qua.
+
+Xem log hoặc dừng database:
+
+```bash
+docker compose logs -f mysql
+docker compose down
+```
+
+Lệnh `docker compose down` giữ lại dữ liệu. Chỉ dùng `docker compose down -v` khi chủ đích muốn xóa toàn bộ database local.
+
+Game Server đọc cấu hình database từ `DB_URL`, hoặc từ bộ `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`. Nếu không khai báo, các giá trị mặc định sẽ khớp với Compose ở trên. `DatabaseManager.initialize(...)` tạo HikariCP pool và chạy Flyway migration trước khi Server phục vụ request.
+
+Integration test với MySQL local chỉ chạy khi bật cờ, để build thông thường không phụ thuộc Docker:
+
+```powershell
+$env:RUN_MYSQL_INTEGRATION_TESTS='true'
+.\mvnw.cmd -pl server -am test
+```
+
+Lần chạy đầu trên database rỗng sẽ tạo `users`, `matches`, `match_players` và `flyway_schema_history`.
+
+## Chạy Game Server
+
+Khởi động MySQL trước, sau đó chạy main class:
+
+```text
+vn.ptit.ltm.server.ServerApplication
+```
+
+Trong IntelliJ IDEA, mở [ServerApplication.java](./server/src/main/java/vn/ptit/ltm/server/ServerApplication.java) và chạy `main`. Server mặc định lắng nghe cổng `5555`; có thể override bằng `SERVER_PORT` và `SERVER_WORKER_THREADS`.
+
+Server hiện hỗ trợ end-to-end:
+
+- `REGISTER`, mật khẩu được hash bằng BCrypt;
+- `LOGIN`, mỗi account chỉ có một active session;
+- `LOGOUT` và session cleanup;
+- `PING` / `PONG`, đóng connection sau 3 heartbeat bị lỡ;
+- detect disconnect và giữ session trong reconnect grace period 60 giây;
+- `RECONNECT` bằng session ID và khôi phục presence state;
+- `GET_ONLINE_PLAYERS` trả danh sách người chơi online cùng điểm, số lần hạng nhất và presence state;
+- tự động broadcast `ONLINE_PLAYERS_UPDATED` khi session hoặc presence state thay đổi.
+
+Không log plain-text password, password hash hay session token.
+
+## Chạy JavaFX Client
+
+Khởi động MySQL và Game Server trước. Sau đó mở terminal khác tại thư mục gốc dự án:
+
+```powershell
+.\mvnw.cmd -pl client javafx:run
+```
+
+Client mặc định kết nối tới `127.0.0.1:5555`. Có thể cấu hình `SERVER_HOST` và `SERVER_PORT` trong run environment của IDE hoặc terminal. Trong IntelliJ IDEA cũng có thể chạy trực tiếp `main` của [ClientApplication.java](./client/src/main/java/vn/ptit/ltm/client/ClientApplication.java).
+
+Client hiện hỗ trợ:
+
+- màn hình Register và Login bằng JavaFX/FXML;
+- gửi `REGISTER`, `LOGIN`, `LOGOUT` qua TCP length-prefixed JSON;
+- ghép request/response bằng `requestId` và hiển thị lỗi nghiệp vụ thân thiện;
+- giữ session/profile trong RAM sau khi đăng nhập;
+- tự phản hồi heartbeat `PING` bằng `PONG`;
+- toàn bộ connect, send, receive và timeout chạy ngoài JavaFX Application Thread.
+
+Màn hình sau đăng nhập hiện là landing tối thiểu để xác nhận session và hồ sơ. Lobby Screen đầy đủ sẽ được nối với `ONLINE_PLAYERS_UPDATED` ở bước tiếp theo.
 
 ## Workflow phát triển
 

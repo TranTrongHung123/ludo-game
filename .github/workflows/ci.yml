@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and test (Java 21)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: ludo_game
+          MYSQL_USER: ludo
+          MYSQL_PASSWORD: ludo_ci_password
+          MYSQL_ROOT_PASSWORD: root_ci_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --host=127.0.0.1 --user=root --password=root_ci_password --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      RUN_MYSQL_INTEGRATION_TESTS: "true"
+      DB_HOST: 127.0.0.1
+      DB_PORT: "3306"
+      DB_NAME: ludo_game
+      DB_USER: ludo
+      DB_PASSWORD: ludo_ci_password
+      DB_POOL_SIZE: "5"
+      DB_CONNECTION_TIMEOUT_MS: "10000"
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: |
+            pom.xml
+            common/pom.xml
+            server/pom.xml
+            client/pom.xml
+            .mvn/wrapper/maven-wrapper.properties
+
+      - name: Prepare Maven Wrapper
+        run: chmod +x ./mvnw
+
+      - name: Verify all modules
+        run: ./mvnw --batch-mode --no-transfer-progress verify
