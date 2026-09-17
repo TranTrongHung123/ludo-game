@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="vn.ptit.ltm.client.controller.GameController"
+            styleClass="app-background">
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="14.0" styleClass="top-bar">
+            <VBox HBox.hgrow="ALWAYS" spacing="3.0">
+                <Label styleClass="screen-title" text="Trận đấu đã bắt đầu"/>
+                <HBox spacing="6.0">
+                    <Label styleClass="screen-subtitle" text="Match ID:"/>
+                    <Label fx:id="matchIdLabel" styleClass="room-code"/>
+                </HBox>
+            </VBox>
+            <Label fx:id="connectionLabel" styleClass="connection-offline"/>
+        </HBox>
+    </top>
+    <center>
+        <VBox spacing="14.0" styleClass="content-card">
+            <padding>
+                <Insets bottom="30.0" left="36.0" right="36.0" top="30.0"/>
+            </padding>
+            <Label fx:id="turnLabel" styleClass="section-title"/>
+            <Label fx:id="phaseLabel" styleClass="screen-subtitle"/>
+            <Label fx:id="diceLabel" styleClass="dice-result"/>
+            <HBox spacing="16.0" VBox.vgrow="ALWAYS">
+                <VBox spacing="8.0" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Người chơi"/>
+                    <ListView fx:id="participantsList" VBox.vgrow="ALWAYS"/>
+                </VBox>
+                <VBox minWidth="340.0" spacing="8.0" HBox.hgrow="ALWAYS">
+                    <Label styleClass="field-label" text="Quân của bạn"/>
+                    <ListView fx:id="piecesList" VBox.vgrow="ALWAYS"/>
+                </VBox>
+            </HBox>
+            <HBox alignment="CENTER_RIGHT" spacing="10.0">
+                <Button fx:id="rollButton" onAction="#handleRollDice" styleClass="primary-button"
+                        text="Đổ xúc xắc"/>
+                <Button fx:id="moveButton" onAction="#handleMovePiece" styleClass="secondary-button"
+                        text="Di chuyển quân đã chọn"/>
+            </HBox>
+            <Label fx:id="feedbackLabel" minHeight="24.0" wrapText="true"/>
+        </VBox>
+    </center>
+</BorderPane>

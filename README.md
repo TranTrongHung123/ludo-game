@@ -214,6 +214,19 @@ Server hiện hỗ trợ end-to-end:
 - `RECONNECT` bằng session ID và khôi phục presence state;
 - `GET_ONLINE_PLAYERS` trả danh sách người chơi online cùng điểm, số lần hạng nhất và presence state;
 - tự động broadcast `ONLINE_PLAYERS_UPDATED` khi session hoặc presence state thay đổi.
+- tạo, tham gia và rời phòng bằng `CREATE_ROOM`, `JOIN_ROOM`, `LEAVE_ROOM`;
+- tự cấp slot/màu, giới hạn 4 người, chuyển host và xóa phòng rỗng;
+- lock riêng theo phòng và broadcast `ROOM_UPDATED` tới đúng thành viên;
+- giữ membership khi mất kết nối và trả lại `RoomDto` khi reconnect trong grace period;
+- mời người chơi `IDLE`, Accept/Reject lời mời dùng một lần và tự hết hạn sau 60 giây;
+- Ready/Unready và Start Game do chủ phòng thực hiện khi tối thiểu 2 người đã Ready;
+- khởi tạo Game State authoritative, 4 quân mỗi người và lượt đầu theo occupied slot nhỏ nhất;
+- `ROLL_DICE` do Server sinh, tính `validPieceIds` và tự chuyển lượt khi không có nước đi;
+- `MOVE_PIECE` authoritative với spawn, chặn quân cùng màu, capture/Shield, Finish Track và carry-over;
+- layout cố định 20 ô đặc biệt và xử lý đầy đủ Speed, Slow, Lucky, Trap, Shield mà không chain effect;
+- bonus roll khi ra 6 hoặc gặp Lucky, turn rotation theo slot, hoàn thành quân/người chơi và xếp hạng trong RAM;
+- `TimeoutManager` authoritative cho phase Roll 8 giây và Move 12 giây, chống callback cũ đổi lượt hai lần bằng `stateVersion`;
+- broadcast `TURN_TIMEOUT` và Game State mới; người chơi `DISCONNECTED + ACTIVE` vẫn nhận lượt và timeout bình thường.
 
 Không log plain-text password, password hash hay session token.
 
@@ -234,9 +247,15 @@ Client hiện hỗ trợ:
 - ghép request/response bằng `requestId` và hiển thị lỗi nghiệp vụ thân thiện;
 - giữ session/profile trong RAM sau khi đăng nhập;
 - tự phản hồi heartbeat `PING` bằng `PONG`;
+- Lobby Screen nhận cả snapshot ban đầu và event `ONLINE_PLAYERS_UPDATED`;
+- tạo phòng, nhập mã để tham gia, xem thành viên/slot/màu và rời phòng;
+- gửi/nhận lời mời phòng, Accept/Reject và hiển thị thời điểm hết hạn;
+- Ready/Unready, Start Game và chuyển sang màn hình trạng thái trận ban đầu;
+- nhận event `ROOM_UPDATED`, `INVITE_PLAYER`, `GAME_STATE` không có `requestId` và cập nhật state trước khi render;
+- đổ xúc xắc, chọn quân hợp lệ và gửi Move Piece từ màn hình trận;
+- render dice, phase, countdown theo deadline Server, lượt hiện tại và vị trí `stepCount` mới nhất từ Game State;
+- nhận `TURN_TIMEOUT`, khóa thao tác khi deadline đã hết và hiển thị phản hồi timeout;
 - toàn bộ connect, send, receive và timeout chạy ngoài JavaFX Application Thread.
-
-Màn hình sau đăng nhập hiện là landing tối thiểu để xác nhận session và hồ sơ. Lobby Screen đầy đủ sẽ được nối với `ONLINE_PLAYERS_UPDATED` ở bước tiếp theo.
 
 ## Workflow phát triển
 

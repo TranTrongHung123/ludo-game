@@ -154,6 +154,19 @@ public final class SessionManager implements AutoCloseable {
         publishSessionsChanged();
     }
 
+    public synchronized void updatePresenceForUser(long userId, PlayerPresenceState presenceState) {
+        String sessionId = sessionIdByUserId.get(userId);
+        if (sessionId == null) {
+            return;
+        }
+        PlayerSession session = sessionsById.get(sessionId);
+        if (session == null) {
+            return;
+        }
+        session.updatePresenceForSystem(presenceState);
+        publishSessionsChanged();
+    }
+
     public synchronized Optional<PlayerSession> findBySessionId(String sessionId) {
         if (sessionId == null || sessionId.isBlank()) {
             return Optional.empty();
@@ -163,6 +176,11 @@ public final class SessionManager implements AutoCloseable {
 
     public synchronized Optional<PlayerSession> findByConnectionId(String connectionId) {
         String sessionId = sessionIdByConnectionId.get(connectionId);
+        return sessionId == null ? Optional.empty() : Optional.ofNullable(sessionsById.get(sessionId));
+    }
+
+    public synchronized Optional<PlayerSession> findByUserId(long userId) {
+        String sessionId = sessionIdByUserId.get(userId);
         return sessionId == null ? Optional.empty() : Optional.ofNullable(sessionsById.get(sessionId));
     }
 

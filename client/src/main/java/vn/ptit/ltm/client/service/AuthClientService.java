@@ -15,6 +15,22 @@ import vn.ptit.ltm.common.dto.auth.LoginRequest;
 import vn.ptit.ltm.common.dto.auth.LoginResult;
 import vn.ptit.ltm.common.dto.auth.RegisterRequest;
 import vn.ptit.ltm.common.dto.auth.RegisterResult;
+import vn.ptit.ltm.common.dto.lobby.OnlinePlayersPayload;
+import vn.ptit.ltm.common.dto.room.CreateRoomRequest;
+import vn.ptit.ltm.common.dto.room.JoinRoomRequest;
+import vn.ptit.ltm.common.dto.room.LeaveRoomRequest;
+import vn.ptit.ltm.common.dto.room.RoomPayload;
+import vn.ptit.ltm.common.dto.room.InvitationDto;
+import vn.ptit.ltm.common.dto.room.InvitePlayerRequest;
+import vn.ptit.ltm.common.dto.room.InviteDecisionRequest;
+import vn.ptit.ltm.common.dto.room.SetReadyRequest;
+import vn.ptit.ltm.common.dto.room.StartGameRequest;
+import vn.ptit.ltm.common.dto.game.GameStateDto;
+import vn.ptit.ltm.common.dto.game.DiceResultDto;
+import vn.ptit.ltm.common.dto.game.MovePieceRequest;
+import vn.ptit.ltm.common.dto.game.MovePieceResultDto;
+import vn.ptit.ltm.common.dto.game.RollDiceRequest;
+import vn.ptit.ltm.common.dto.game.TurnTimeoutDto;
 import vn.ptit.ltm.common.enums.MessageType;
 import vn.ptit.ltm.common.error.ErrorCode;
 import vn.ptit.ltm.common.protocol.JsonMessageCodec;
@@ -50,6 +66,8 @@ public final class AuthClientService implements AutoCloseable, ClientMessageList
             new ConcurrentHashMap<>();
     private final CopyOnWriteArrayList<Consumer<ConnectionState>> connectionListeners =
             new CopyOnWriteArrayList<>();
+    private final ConcurrentHashMap<MessageType, CopyOnWriteArrayList<Runnable>> stateListeners =
+            new ConcurrentHashMap<>();
     private final Object connectionLock = new Object();
     private final AtomicBoolean closed = new AtomicBoolean();
 
@@ -139,6 +157,148 @@ public final class AuthClientService implements AutoCloseable, ClientMessageList
         ).thenAccept(ignored -> sessionState.clear());
     }
 
+    public CompletableFuture<OnlinePlayersPayload> getOnlinePlayers() {
+        return authenticatedRequest(
+                MessageType.GET_ONLINE_PLAYERS,
+                EmptyPayload.INSTANCE,
+                MessageType.ONLINE_PLAYERS_UPDATED,
+                OnlinePlayersPayload.class
+        ).thenApply(payload -> {
+            sessionState.updateOnlinePlayers(payload);
+            notifyStateListeners(MessageType.ONLINE_PLAYERS_UPDATED);
+            return payload;
+        });
+    }
+
+    public CompletableFuture<RoomPayload> createRoom() {
+        return authenticatedRequest(
+                MessageType.CREATE_ROOM,
+                new CreateRoomRequest(),
+                MessageType.CREATE_ROOM,
+                RoomPayload.class
+        ).thenApply(payload -> {
+            sessionState.updateRoom(payload.room());
+            sessionState.clearInvitation();
+            notifyStateListeners(MessageType.ROOM_UPDATED);
+            return payload;
+        });
+    }
+
+    public CompletableFuture<RoomPayload> joinRoom(String roomId) {
+        return authenticatedRequest(
+                MessageType.JOIN_ROOM,
+                new JoinRoomRequest(roomId),
+                MessageType.JOIN_ROOM,
+                RoomPayload.class
+        ).thenApply(payload -> {
+            sessionState.updateRoom(payload.room());
+            sessionState.clearInvitation();
+            notifyStateListeners(MessageType.ROOM_UPDATED);
+            return payload;
+        });
+    }
+
+    public CompletableFuture<Void> leaveRoom(String roomId) {
+        return authenticatedRequest(
+                MessageType.LEAVE_ROOM,
+                new LeaveRoomRequest(roomId),
+                MessageType.LEAVE_ROOM,
+                EmptyPayload.class
+        ).thenAccept(ignored -> {
+            sessionState.clearRoom();
+            notifyStateListeners(MessageType.ROOM_UPDATED);
+        });
+    }
+
+    public CompletableFuture<InvitationDto> invitePlayer(String roomId, String playerId) {
+        return authenticatedRequest(
+                MessageType.INVITE_PLAYER,
+                new InvitePlayerRequest(roomId, playerId),
+                MessageType.INVITE_PLAYER,
+                InvitationDto.class
+        );
+    }
+
+    public CompletableFuture<RoomPayload> acceptInvitation(String invitationId) {
+        return authenticatedRequest(
+                MessageType.ACCEPT_INVITE,
+                new InviteDecisionRequest(invitationId),
+                MessageType.ACCEPT_INVITE,
+                RoomPayload.class
+        ).thenApply(payload -> {
+            sessionState.clearInvitation();
+            sessionState.updateRoom(payload.room());
+            notifyStateListeners(MessageType.INVITE_PLAYER);
+            notifyStateListeners(MessageType.ROOM_UPDATED);
+            return payload;
+        });
+    }
+
+    public CompletableFuture<Void> rejectInvitation(String invitationId) {
+        return authenticatedRequest(
+                MessageType.REJECT_INVITE,
+                new InviteDecisionRequest(invitationId),
+                MessageType.REJECT_INVITE,
+                EmptyPayload.class
+        ).thenAccept(ignored -> {
+            sessionState.clearInvitation();
+            notifyStateListeners(MessageType.INVITE_PLAYER);
+        });
+    }
+
+    public CompletableFuture<RoomPayload> setReady(String roomId, boolean ready) {
+        MessageType type = ready ? MessageType.READY : MessageType.UNREADY;
+        return authenticatedRequest(
+                type,
+                new SetReadyRequest(roomId, ready),
+                type,
+                RoomPayload.class
+        ).thenApply(payload -> {
+            sessionState.updateRoom(payload.room());
+            notifyStateListeners(MessageType.ROOM_UPDATED);
+            return payload;
+        });
+    }
+
+    public CompletableFuture<GameStateDto> startGame(String roomId) {
+        return authenticatedRequest(
+                MessageType.START_GAME,
+                new StartGameRequest(roomId),
+                MessageType.START_GAME,
+                GameStateDto.class
+        ).thenApply(gameState -> {
+            sessionState.updateGameState(gameState);
+            notifyStateListeners(MessageType.GAME_STATE);
+            return gameState;
+        });
+    }
+
+    public CompletableFuture<DiceResultDto> rollDice(String roomId) {
+        return authenticatedRequest(
+                MessageType.ROLL_DICE,
+                new RollDiceRequest(roomId),
+                MessageType.DICE_RESULT,
+                DiceResultDto.class
+        ).thenApply(result -> {
+            sessionState.updateDiceResult(result);
+            notifyStateListeners(MessageType.DICE_RESULT);
+            return result;
+        });
+    }
+
+    public CompletableFuture<MovePieceResultDto> movePiece(String roomId, String pieceId) {
+        return authenticatedRequest(
+                MessageType.MOVE_PIECE,
+                new MovePieceRequest(roomId, pieceId),
+                MessageType.MOVE_PIECE_RESULT,
+                MovePieceResultDto.class
+        ).thenApply(result -> {
+            sessionState.updateGameState(result.gameState());
+            notifyStateListeners(MessageType.GAME_STATE_UPDATED);
+            return result;
+        });
+    }
+
     public ConnectionState connectionState() {
         return connectionState;
     }
@@ -153,15 +313,78 @@ public final class AuthClientService implements AutoCloseable, ClientMessageList
         return () -> connectionListeners.remove(requiredListener);
     }
 
+    public Runnable addStateListener(MessageType type, Runnable listener) {
+        Objects.requireNonNull(type, "type");
+        Runnable requiredListener = Objects.requireNonNull(listener, "listener");
+        stateListeners.computeIfAbsent(type, ignored -> new CopyOnWriteArrayList<>())
+                .add(requiredListener);
+        return () -> {
+            CopyOnWriteArrayList<Runnable> listeners = stateListeners.get(type);
+            if (listeners != null) {
+                listeners.remove(requiredListener);
+            }
+        };
+    }
+
     @Override
     public void onMessage(MessageEnvelope message) {
         String requestId = message.requestId();
-        if (requestId == null) {
+        if (requestId != null) {
+            CompletableFuture<MessageEnvelope> pending = pendingRequests.get(requestId);
+            if (pending != null) {
+                pending.complete(message);
+                return;
+            }
+        }
+        try {
+            applyServerEvent(message);
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Ignoring invalid server event {}", message.type(), exception);
+        }
+    }
+
+    private void applyServerEvent(MessageEnvelope message) {
+        try {
+            switch (message.type()) {
+                case ONLINE_PLAYERS_UPDATED -> sessionState.updateOnlinePlayers(
+                        payloadMapper.fromTree(message.data(), OnlinePlayersPayload.class)
+                );
+                case ROOM_UPDATED -> sessionState.updateRoom(
+                        payloadMapper.fromTree(message.data(), RoomPayload.class).room()
+                );
+                case INVITE_PLAYER -> sessionState.updateInvitation(
+                        payloadMapper.fromTree(message.data(), InvitationDto.class)
+                );
+                case DICE_RESULT -> sessionState.updateDiceResult(
+                        payloadMapper.fromTree(message.data(), DiceResultDto.class)
+                );
+                case GAME_STATE, GAME_STATE_UPDATED -> sessionState.updateGameState(
+                        payloadMapper.fromTree(message.data(), GameStateDto.class)
+                );
+                case TURN_TIMEOUT -> sessionState.updateTurnTimeout(
+                        payloadMapper.fromTree(message.data(), TurnTimeoutDto.class)
+                );
+                default -> {
+                    return;
+                }
+            }
+            notifyStateListeners(message.type());
+        } catch (JsonProcessingException | NullPointerException exception) {
+            throw new ClientProtocolException("Server returned an invalid event payload", exception);
+        }
+    }
+
+    private void notifyStateListeners(MessageType type) {
+        CopyOnWriteArrayList<Runnable> listeners = stateListeners.get(type);
+        if (listeners == null) {
             return;
         }
-        CompletableFuture<MessageEnvelope> pending = pendingRequests.get(requestId);
-        if (pending != null) {
-            pending.complete(message);
+        for (Runnable listener : listeners) {
+            try {
+                listener.run();
+            } catch (RuntimeException exception) {
+                LOGGER.error("Client state listener failed for {}", type, exception);
+            }
         }
     }
 
@@ -206,6 +429,21 @@ public final class AuthClientService implements AutoCloseable, ClientMessageList
                 .orTimeout(REQUEST_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
                 .thenApply(response -> decodeResponse(response, responseType, responseClass))
                 .whenComplete((result, failure) -> pendingRequests.remove(requestId, responseFuture));
+    }
+
+    private <T> CompletableFuture<T> authenticatedRequest(
+            MessageType requestType,
+            Object payload,
+            MessageType responseType,
+            Class<T> responseClass
+    ) {
+        String sessionId;
+        try {
+            sessionId = sessionState.requireSessionId();
+        } catch (IllegalStateException exception) {
+            return CompletableFuture.failedFuture(exception);
+        }
+        return request(requestType, sessionId, payload, responseType, responseClass);
     }
 
     private <T> T decodeResponse(
@@ -257,6 +495,7 @@ public final class AuthClientService implements AutoCloseable, ClientMessageList
         pendingRequests.values().forEach(pending -> pending.completeExceptionally(failure));
         pendingRequests.clear();
         connectionListeners.clear();
+        stateListeners.clear();
         tcpClient.close();
         requestExecutor.shutdownNow();
         connectionState = ConnectionState.DISCONNECTED;

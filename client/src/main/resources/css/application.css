@@ -133,3 +133,49 @@
     -fx-font-weight: 700;
     -fx-padding: 10px 16px;
 }
+
+.top-bar {
+    -fx-background-color: white;
+    -fx-padding: 18px 30px;
+    -fx-border-color: transparent transparent #e2e6ef transparent;
+}
+
+.content-card {
+    -fx-background-color: white;
+    -fx-background-radius: 16px;
+    -fx-padding: 24px;
+    -fx-effect: dropshadow(gaussian, rgba(38, 45, 73, 0.10), 20, 0.10, 0, 7);
+}
+
+.section-title {
+    -fx-text-fill: #172033;
+    -fx-font-size: 19px;
+    -fx-font-weight: 800;
+}
+
+.room-code {
+    -fx-text-fill: #5138bd;
+    -fx-font-family: "Consolas", monospace;
+    -fx-font-weight: 800;
+}
+
+.list-view {
+    -fx-background-color: #f7f8fc;
+    -fx-border-color: #dce1ec;
+    -fx-border-radius: 10px;
+    -fx-background-radius: 10px;
+}
+
+.invitation-card {
+    -fx-background-color: #fff7df;
+    -fx-background-radius: 10px;
+    -fx-border-color: #f0d98a;
+    -fx-border-radius: 10px;
+    -fx-padding: 12px;
+}
+
+.dice-result {
+    -fx-font-size: 18px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #7c3aed;
+}

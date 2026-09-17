@@ -7,6 +7,7 @@ public final class GameConstants {
     public static final long ROLL_PHASE_DURATION_MILLIS = 8_000L;
     public static final long MOVE_PHASE_DURATION_MILLIS = 12_000L;
     public static final long RECONNECT_GRACE_PERIOD_MILLIS = 60_000L;
+    public static final long INVITATION_TTL_MILLIS = 60_000L;
 
     private GameConstants() {
     }

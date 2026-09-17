@@ -2,22 +2,13 @@ package vn.ptit.ltm.server.service;
 
 import vn.ptit.ltm.common.error.ErrorCode;
 
-import java.util.Objects;
-
-public final class AuthException extends RuntimeException {
-    private final ErrorCode errorCode;
+public final class AuthException extends ServiceException {
 
     public AuthException(ErrorCode errorCode, String message) {
-        super(message);
-        this.errorCode = Objects.requireNonNull(errorCode, "errorCode");
+        super(errorCode, message);
     }
 
     public AuthException(ErrorCode errorCode, String message, Throwable cause) {
-        super(message, cause);
-        this.errorCode = Objects.requireNonNull(errorCode, "errorCode");
-    }
-
-    public ErrorCode errorCode() {
-        return errorCode;
+        super(errorCode, message, cause);
     }
 }

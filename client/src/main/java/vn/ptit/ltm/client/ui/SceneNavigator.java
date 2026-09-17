@@ -4,10 +4,12 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
-import vn.ptit.ltm.client.controller.AuthenticatedController;
 import vn.ptit.ltm.client.controller.ConnectionAwareController;
+import vn.ptit.ltm.client.controller.LobbyController;
 import vn.ptit.ltm.client.controller.LoginController;
 import vn.ptit.ltm.client.controller.RegisterController;
+import vn.ptit.ltm.client.controller.RoomController;
+import vn.ptit.ltm.client.controller.GameController;
 import vn.ptit.ltm.client.service.AuthClientService;
 import vn.ptit.ltm.client.state.ClientSessionState;
 import vn.ptit.ltm.client.state.ConnectionState;
@@ -51,11 +53,31 @@ public final class SceneNavigator {
     }
 
     public void showAuthenticated() {
-        FXMLLoader loader = loader("/fxml/authenticated.fxml");
+        showLobby();
+    }
+
+    public void showLobby() {
+        FXMLLoader loader = loader("/fxml/lobby.fxml");
         Parent root = load(loader);
-        AuthenticatedController controller = loader.getController();
+        LobbyController controller = loader.getController();
         controller.configure(authService, sessionState, this);
         show(root, controller, "Sảnh chờ");
+    }
+
+    public void showRoom() {
+        FXMLLoader loader = loader("/fxml/room.fxml");
+        Parent root = load(loader);
+        RoomController controller = loader.getController();
+        controller.configure(authService, sessionState, this);
+        show(root, controller, "Phòng chờ");
+    }
+
+    public void showGame() {
+        FXMLLoader loader = loader("/fxml/game.fxml");
+        Parent root = load(loader);
+        GameController controller = loader.getController();
+        controller.configure(authService, sessionState);
+        show(root, controller, "Trận đấu");
     }
 
     public void onConnectionStateChanged(ConnectionState state) {
@@ -65,6 +87,9 @@ public final class SceneNavigator {
     }
 
     private void show(Parent root, ConnectionAwareController controller, String viewTitle) {
+        if (currentController != null) {
+            currentController.dispose();
+        }
         currentController = controller;
         Scene scene = stage.getScene();
         if (scene == null) {
