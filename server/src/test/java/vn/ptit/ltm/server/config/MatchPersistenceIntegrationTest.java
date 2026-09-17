@@ -48,7 +48,7 @@ class MatchPersistenceIntegrationTest {
                 assertEquals(firstSave, repeatedSave);
                 assertEquals(new BigDecimal("3.0"), firstSave.players().getFirst().totalScore());
                 assertEquals(1, firstSave.players().getFirst().firstPlaceCount());
-                assertEquals(BigDecimal.ZERO, firstSave.players().getLast().scoreEarned());
+                assertEquals(0, BigDecimal.ZERO.compareTo(firstSave.players().getLast().scoreEarned()));
                 assertEquals(0, firstSave.players().getLast().firstPlaceCount());
 
                 var history = matches.findMatchHistory(userIds.getFirst(), 50);
