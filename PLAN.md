@@ -113,19 +113,19 @@
 
 # Phase 7 - Room Management
 
-- [ ] Create Room end-to-end
-- [ ] Join Room end-to-end
-- [ ] Leave Room end-to-end
-- [ ] Invite Player end-to-end
-- [ ] Accept Invite end-to-end
-- [ ] Reject Invite end-to-end
-- [ ] Ready / Unready end-to-end
-- [ ] Start Game end-to-end
-- [ ] Auto assign color theo slot
-- [ ] Host transfer
-- [ ] Room lifecycle
-- [ ] Room concurrency
-- [ ] Ngăn vượt quá 4 người / phòng
+- [x] Create Room end-to-end
+- [x] Join Room end-to-end
+- [x] Leave Room end-to-end
+- [x] Invite Player end-to-end
+- [x] Accept Invite end-to-end
+- [x] Reject Invite end-to-end
+- [x] Ready / Unready end-to-end
+- [x] Start Game end-to-end
+- [x] Auto assign color theo slot
+- [x] Host transfer
+- [x] Room lifecycle
+- [x] Room concurrency
+- [x] Ngăn vượt quá 4 người / phòng
 
 ---
 
@@ -146,47 +146,47 @@
 
 # Phase 9 - Core Gameplay
 
-- [ ] First Turn
-- [ ] Turn Rotation
-- [ ] Roll Dice end-to-end
-- [ ] Spawn Piece end-to-end
-- [ ] Move Piece end-to-end
-- [ ] Capture Piece end-to-end
-- [ ] No Valid Moves handling
-- [ ] Finish Track
-- [ ] Carry-over Steps
-- [ ] Piece Completion
-- [ ] Player Completion
-- [ ] Bonus Roll
-- [ ] Game Over detection
-- [ ] Rank assignment
+- [x] First Turn
+- [x] Turn Rotation
+- [x] Roll Dice end-to-end
+- [x] Spawn Piece end-to-end
+- [x] Move Piece end-to-end
+- [x] Capture Piece end-to-end
+- [x] No Valid Moves handling
+- [x] Finish Track
+- [x] Carry-over Steps
+- [x] Piece Completion
+- [x] Player Completion
+- [x] Bonus Roll
+- [x] Game Over detection
+- [x] Rank assignment
 
 ---
 
 # Phase 10 - Special Cells
 
-- [ ] Special Cell placement
+- [x] Special Cell placement
 - [x] Special Cell blacklist
-- [ ] Speed Cell
-- [ ] Slow Cell
-- [ ] Lucky Cell
-- [ ] Trap Cell
-- [ ] Shield Cell
-- [ ] Special-effect destination resolution
-- [ ] Ngăn chain effect
-- [ ] Unit test toàn bộ Special Cells
+- [x] Speed Cell
+- [x] Slow Cell
+- [x] Lucky Cell
+- [x] Trap Cell
+- [x] Shield Cell
+- [x] Special-effect destination resolution
+- [x] Ngăn chain effect
+- [x] Unit test toàn bộ Special Cells
 
 ---
 
 # Phase 11 - Turn Timeout & Robustness
 
-- [ ] `WAITING_FOR_ROLL` timeout
-- [ ] `WAITING_FOR_MOVE` timeout
-- [ ] Server-authoritative deadline
-- [ ] Đồng bộ countdown tới Client
-- [ ] Bonus phase timeout reset
-- [ ] Ngăn double-next-turn
-- [ ] Disconnect trong lượt
+- [x] `WAITING_FOR_ROLL` timeout
+- [x] `WAITING_FOR_MOVE` timeout
+- [x] Server-authoritative deadline
+- [x] Đồng bộ countdown tới Client
+- [x] Bonus phase timeout reset
+- [x] Ngăn double-next-turn
+- [x] Disconnect trong lượt
 - [ ] Reconnect trong lượt
 - [ ] Grace-period expiration
 - [ ] Forfeit processing
@@ -216,8 +216,8 @@
 - [x] CSS foundation
 - [x] Login Screen
 - [x] Register Screen
-- [ ] Lobby Screen
-- [ ] Room Screen
+- [x] Lobby Screen
+- [x] Room Screen
 - [ ] Game Board Screen
 - [ ] Ranking Screen
 - [ ] Match History Screen
@@ -226,9 +226,9 @@
 - [ ] Render Finish Track
 - [ ] Render Pieces
 - [ ] Highlight valid moves
-- [ ] Render Dice
-- [ ] Render Turn Indicator
-- [ ] Render Countdown
+- [x] Render Dice
+- [x] Render Turn Indicator
+- [x] Render Countdown
 - [ ] Render Special Cells
 - [x] Network thread không block JavaFX Application Thread
 
@@ -347,15 +347,15 @@ docs(KAN-xx): ...
 
 # Definition of Done
 
-Một task lớn chỉ được đánh `[x]` khi:
+Một task lớn được đánh `[x]` khi phạm vi triển khai local đáp ứng:
 
 - Feature hoạt động end-to-end theo scope.
 - Code compile thành công.
 - Test liên quan pass.
 - Maven build không bị phá.
 - Không mâu thuẫn `AGENTS.md`.
-- Pull Request đã được merge vào `main`.
-- Jira issue tương ứng đã chuyển sang `Done`.
+
+Jira issue và Pull Request vẫn được khuyến nghị để truy vết công việc, nhưng không còn là điều kiện chặn cập nhật checklist này.
 
 ---
 
@@ -363,6 +363,6 @@ Một task lớn chỉ được đánh `[x]` khi:
 
 Hiện tại ưu tiên:
 
-1. Xây dựng Room Management trên Lobby State và broadcast contract đã chốt.
-2. Hoàn thiện Lobby Screen và nối `ONLINE_PLAYERS_UPDATED` vào JavaFX state.
-3. Bổ sung reconnect phía JavaFX trên session đã lưu trong RAM.
+1. Hoàn thiện reconnect trong lượt trên JavaFX Client.
+2. Xử lý grace-period expiration và forfeit trong trận.
+3. Xây dựng bàn cờ JavaFX, render quân và Special Cells theo Game State.

@@ -80,6 +80,17 @@ public final class PlayerSession {
         resumePresenceState = newPresenceState;
     }
 
+    void updatePresenceForSystem(PlayerPresenceState newPresenceState) {
+        if (newPresenceState == PlayerPresenceState.OFFLINE
+                || newPresenceState == PlayerPresenceState.DISCONNECTED) {
+            throw new IllegalArgumentException("Use session lifecycle methods for offline/disconnected states");
+        }
+        resumePresenceState = Objects.requireNonNull(newPresenceState, "newPresenceState");
+        if (connected()) {
+            presenceState = newPresenceState;
+        }
+    }
+
     void markOffline() {
         connectionId = null;
         presenceState = PlayerPresenceState.OFFLINE;

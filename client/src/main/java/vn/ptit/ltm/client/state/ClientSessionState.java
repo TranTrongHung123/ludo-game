@@ -1,7 +1,13 @@
 package vn.ptit.ltm.client.state;
 
 import vn.ptit.ltm.common.dto.auth.LoginResult;
+import vn.ptit.ltm.common.dto.lobby.OnlinePlayersPayload;
 import vn.ptit.ltm.common.dto.player.PlayerProfileDto;
+import vn.ptit.ltm.common.dto.room.RoomDto;
+import vn.ptit.ltm.common.dto.room.InvitationDto;
+import vn.ptit.ltm.common.dto.game.GameStateDto;
+import vn.ptit.ltm.common.dto.game.DiceResultDto;
+import vn.ptit.ltm.common.dto.game.TurnTimeoutDto;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -9,6 +15,12 @@ import java.util.Optional;
 public final class ClientSessionState {
     private String sessionId;
     private PlayerProfileDto profile;
+    private OnlinePlayersPayload onlinePlayers = new OnlinePlayersPayload(null);
+    private RoomDto room;
+    private InvitationDto invitation;
+    private GameStateDto gameState;
+    private DiceResultDto lastDiceResult;
+    private TurnTimeoutDto lastTurnTimeout;
 
     public synchronized void authenticate(LoginResult result) {
         Objects.requireNonNull(result, "result");
@@ -31,8 +43,83 @@ public final class ClientSessionState {
         return sessionId;
     }
 
+    public synchronized OnlinePlayersPayload onlinePlayers() {
+        return onlinePlayers;
+    }
+
+    public synchronized void updateOnlinePlayers(OnlinePlayersPayload payload) {
+        onlinePlayers = Objects.requireNonNull(payload, "payload");
+    }
+
+    public synchronized Optional<RoomDto> room() {
+        return Optional.ofNullable(room);
+    }
+
+    public synchronized void updateRoom(RoomDto updatedRoom) {
+        room = Objects.requireNonNull(updatedRoom, "updatedRoom");
+    }
+
+    public synchronized void clearRoom() {
+        room = null;
+        gameState = null;
+        lastDiceResult = null;
+        lastTurnTimeout = null;
+    }
+
+    public synchronized Optional<InvitationDto> invitation() {
+        return Optional.ofNullable(invitation);
+    }
+
+    public synchronized void updateInvitation(InvitationDto updatedInvitation) {
+        invitation = Objects.requireNonNull(updatedInvitation, "updatedInvitation");
+    }
+
+    public synchronized void clearInvitation() {
+        invitation = null;
+    }
+
+    public synchronized Optional<GameStateDto> gameState() {
+        return Optional.ofNullable(gameState);
+    }
+
+    public synchronized void updateGameState(GameStateDto updatedGameState) {
+        Objects.requireNonNull(updatedGameState, "updatedGameState");
+        if (gameState != null
+                && gameState.matchId().equals(updatedGameState.matchId())
+                && updatedGameState.stateVersion() < gameState.stateVersion()) {
+            return;
+        }
+        if (gameState == null || !gameState.matchId().equals(updatedGameState.matchId())) {
+            lastDiceResult = null;
+            lastTurnTimeout = null;
+        }
+        gameState = updatedGameState;
+    }
+
+    public synchronized Optional<DiceResultDto> lastDiceResult() {
+        return Optional.ofNullable(lastDiceResult);
+    }
+
+    public synchronized void updateDiceResult(DiceResultDto diceResult) {
+        lastDiceResult = Objects.requireNonNull(diceResult, "diceResult");
+    }
+
+    public synchronized Optional<TurnTimeoutDto> lastTurnTimeout() {
+        return Optional.ofNullable(lastTurnTimeout);
+    }
+
+    public synchronized void updateTurnTimeout(TurnTimeoutDto timeout) {
+        lastTurnTimeout = Objects.requireNonNull(timeout, "timeout");
+    }
+
     public synchronized void clear() {
         sessionId = null;
         profile = null;
+        onlinePlayers = new OnlinePlayersPayload(null);
+        room = null;
+        invitation = null;
+        gameState = null;
+        lastDiceResult = null;
+        lastTurnTimeout = null;
     }
 }

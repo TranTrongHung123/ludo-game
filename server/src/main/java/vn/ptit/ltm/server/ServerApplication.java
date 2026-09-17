@@ -2,6 +2,7 @@ package vn.ptit.ltm.server;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import vn.ptit.ltm.common.dto.session.ReconnectResult;
 import vn.ptit.ltm.server.config.DatabaseConfig;
 import vn.ptit.ltm.server.config.DatabaseManager;
 import vn.ptit.ltm.server.network.AuthMessageHandler;
@@ -11,11 +12,11 @@ import vn.ptit.ltm.server.network.ConnectionRegistry;
 import vn.ptit.ltm.server.network.TcpServer;
 import vn.ptit.ltm.server.lobby.LobbyService;
 import vn.ptit.ltm.server.repository.JdbcUserRepository;
+import vn.ptit.ltm.server.room.RoomService;
 import vn.ptit.ltm.server.service.AuthService;
 import vn.ptit.ltm.server.service.BCryptPasswordHasher;
 import vn.ptit.ltm.server.session.SessionConnectionListener;
 import vn.ptit.ltm.server.session.SessionManager;
-import vn.ptit.ltm.server.session.SessionStateProvider;
 
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
@@ -29,6 +30,7 @@ public final class ServerApplication implements AutoCloseable {
     private final DatabaseManager databaseManager;
     private final SessionManager sessionManager;
     private final HeartbeatManager heartbeatManager;
+    private final RoomService roomService;
     private final TcpServer tcpServer;
     private final CountDownLatch stopped = new CountDownLatch(1);
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -37,11 +39,13 @@ public final class ServerApplication implements AutoCloseable {
             DatabaseManager databaseManager,
             SessionManager sessionManager,
             HeartbeatManager heartbeatManager,
+            RoomService roomService,
             TcpServer tcpServer
     ) {
         this.databaseManager = databaseManager;
         this.sessionManager = sessionManager;
         this.heartbeatManager = heartbeatManager;
+        this.roomService = roomService;
         this.tcpServer = tcpServer;
     }
 
@@ -49,10 +53,14 @@ public final class ServerApplication implements AutoCloseable {
         DatabaseManager database = DatabaseManager.initialize(DatabaseConfig.fromEnvironment());
         SessionManager sessions = new SessionManager();
         HeartbeatManager heartbeat = new HeartbeatManager();
+        RoomService rooms = null;
         try {
             ConnectionRegistry connections = new ConnectionRegistry();
             LobbyService lobby = new LobbyService(sessions, connections);
+            rooms = new RoomService(sessions, connections);
+            RoomService activeRooms = rooms;
             sessions.addEventListener(lobby::broadcastOnlinePlayers);
+            sessions.addEventListener(activeRooms::onSessionsChanged);
             AuthService authService = new AuthService(
                     new JdbcUserRepository(database.dataSource()),
                     new BCryptPasswordHasher(),
@@ -61,9 +69,15 @@ public final class ServerApplication implements AutoCloseable {
             AuthMessageHandler messageHandler = new AuthMessageHandler(
                     authService,
                     sessions,
-                    SessionStateProvider.basic(),
+                    session -> new ReconnectResult(
+                            true,
+                            session.presenceState(),
+                            activeRooms.roomForPlayer(session.user().id()).orElse(null),
+                            activeRooms.gameForPlayer(session.user().id()).orElse(null)
+                    ),
                     heartbeat,
-                    lobby
+                    lobby,
+                    activeRooms
             );
             TcpServer server = new TcpServer(
                     environmentInt("SERVER_PORT", DEFAULT_PORT, 1, 65_535),
@@ -75,8 +89,11 @@ public final class ServerApplication implements AutoCloseable {
                             new SessionConnectionListener(sessions)
                     )
             );
-            return new ServerApplication(database, sessions, heartbeat, server);
+            return new ServerApplication(database, sessions, heartbeat, activeRooms, server);
         } catch (RuntimeException exception) {
+            if (rooms != null) {
+                rooms.close();
+            }
             heartbeat.close();
             sessions.close();
             database.close();
@@ -100,6 +117,7 @@ public final class ServerApplication implements AutoCloseable {
         }
         tcpServer.close();
         heartbeatManager.close();
+        roomService.close();
         sessionManager.close();
         databaseManager.close();
         stopped.countDown();

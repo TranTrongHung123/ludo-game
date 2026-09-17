@@ -535,6 +535,15 @@ IDLE → IN_ROOM
 
 Chủ phòng có thể mời người đang `IDLE`.
 
+Quy tắc canonical của lời mời:
+
+- lời mời có hiệu lực đúng **60 giây** theo đồng hồ Server;
+- mỗi người nhận chỉ có tối đa một lời mời đang chờ; lời mời mới thay thế lời mời cũ;
+- chỉ đúng người nhận mới được Accept/Reject;
+- Accept hoặc Reject tiêu thụ lời mời và không thể dùng lại;
+- khi Accept, Server phải kiểm tra lại người nhận vẫn `IDLE`, phòng còn `WAITING` và còn chỗ;
+- lời mời của phòng bị hủy khi thành viên phòng thay đổi hoặc trận bắt đầu.
+
 Người nhận lời mời có thể:
 
 - `ACCEPT`;
@@ -547,7 +556,9 @@ Người đã ở một phòng không được nhận lời mời phòng khác.
 Chủ phòng được bắt đầu khi:
 
 - có ít nhất 2 người;
-- tất cả điều kiện khác của phòng hợp lệ.
+- tất cả thành viên hiện tại, **bao gồm chủ phòng**, đã Ready;
+- tất cả thành viên đang kết nối và có `presenceState = IN_ROOM`;
+- phòng đang ở `RoomState.WAITING`.
 
 Khi bắt đầu:
 
@@ -555,6 +566,14 @@ Khi bắt đầu:
 IN_ROOM → PLAYING
 RoomState = PLAYING
 ```
+
+Server đồng thời:
+
+- vô hiệu hóa các lời mời còn lại của phòng;
+- khởi tạo đầy đủ Game State và 4 quân `IN_YARD` cho mỗi participant;
+- chọn occupied `slotIndex` nhỏ nhất làm người đi đầu;
+- bắt đầu phase `WAITING_FOR_ROLL` với deadline authoritative;
+- broadcast `ROOM_UPDATED` và `GAME_STATE` cho mọi thành viên.
 
 ---
 
@@ -1447,6 +1466,20 @@ Mục tiêu:
 - không làm thay đổi semantics của Spawn;
 - không làm rối thời điểm chuyển từ vòng chung sang Finish Track;
 - Client và Server có layout đặc biệt nhất quán.
+
+### Layout canonical hiện tại
+
+Phiên bản hiện tại dùng layout cố định, đối xứng qua bốn phần tư của vòng chung:
+
+```text
+SPEED  → 2, 14, 26, 38
+SLOW   → 4, 16, 28, 40
+LUCKY  → 6, 18, 30, 42
+TRAP   → 8, 20, 32, 44
+SHIELD → 10, 22, 34, 46
+```
+
+Server đưa toàn bộ layout này vào `GameState.specialCells` khi khởi tạo trận. Client render đúng danh sách Server gửi, không tự tạo layout riêng.
 
 ## 23.2. Tăng tốc
 
@@ -3344,3 +3377,5 @@ Các quyết định sau là bản chính:
 - `COMPLETED` và `FORFEITED` luôn bị bỏ qua.
 - Trước `nextTurn()`, Server luôn gọi `evaluateGameEnd()`.
 - Trạng thái hiện diện/kết nối và trạng thái participant trong match là hai khái niệm riêng.
+- Lời mời phòng hết hạn sau đúng 60 giây theo đồng hồ Server; mỗi người nhận chỉ giữ lời mời mới nhất.
+- Mọi thành viên phòng, kể cả chủ phòng, phải Ready trước khi chủ phòng được Start Game.

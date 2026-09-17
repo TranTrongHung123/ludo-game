@@ -14,5 +14,8 @@ public record InvitationDto(
         Objects.requireNonNull(roomId, "roomId");
         Objects.requireNonNull(inviterPlayerId, "inviterPlayerId");
         Objects.requireNonNull(inviterDisplayName, "inviterDisplayName");
+        if (expiresAtEpochMillis <= 0) {
+            throw new IllegalArgumentException("expiresAtEpochMillis must be positive");
+        }
     }
 }

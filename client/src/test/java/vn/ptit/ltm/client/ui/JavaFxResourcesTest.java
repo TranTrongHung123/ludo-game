@@ -14,6 +14,9 @@ class JavaFxResourcesTest {
         assertWellFormed("/fxml/login.fxml");
         assertWellFormed("/fxml/register.fxml");
         assertWellFormed("/fxml/authenticated.fxml");
+        assertWellFormed("/fxml/lobby.fxml");
+        assertWellFormed("/fxml/room.fxml");
+        assertWellFormed("/fxml/game.fxml");
 
         try (InputStream stylesheet = resource("/css/application.css")) {
             assertTrue(stylesheet.readAllBytes().length > 0);

@@ -6,17 +6,23 @@ import vn.ptit.ltm.client.network.ClientRequestException;
 import vn.ptit.ltm.client.state.ClientSessionState;
 import vn.ptit.ltm.client.state.ConnectionState;
 import vn.ptit.ltm.common.error.ErrorCode;
+import vn.ptit.ltm.common.enums.RoomState;
+import vn.ptit.ltm.common.enums.TurnState;
+import vn.ptit.ltm.common.enums.PieceState;
 import vn.ptit.ltm.server.network.AuthMessageHandler;
 import vn.ptit.ltm.server.network.CompositeConnectionListener;
 import vn.ptit.ltm.server.network.HeartbeatManager;
 import vn.ptit.ltm.server.network.TcpServer;
+import vn.ptit.ltm.server.network.ConnectionRegistry;
+import vn.ptit.ltm.server.lobby.LobbyService;
 import vn.ptit.ltm.server.repository.UserAccountRecord;
 import vn.ptit.ltm.server.repository.UserRepository;
+import vn.ptit.ltm.server.room.RoomService;
+import vn.ptit.ltm.server.game.DiceRoller;
 import vn.ptit.ltm.server.service.AuthService;
 import vn.ptit.ltm.server.service.PasswordHasher;
 import vn.ptit.ltm.server.session.SessionConnectionListener;
 import vn.ptit.ltm.server.session.SessionManager;
-import vn.ptit.ltm.server.session.SessionStateProvider;
 
 import java.math.BigDecimal;
 import java.sql.SQLException;
@@ -24,10 +30,12 @@ import java.sql.SQLIntegrityConstraintViolationException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.ArrayDeque;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -87,25 +95,181 @@ class AuthClientServiceIntegrationTest {
         }
     }
 
+    @Test
+    void roomLifecycleAndUnsolicitedRoomUpdatesWorkAcrossTwoClients() throws Exception {
+        InMemoryUserRepository users = new InMemoryUserRepository();
+        ClientSessionState aliceState = new ClientSessionState();
+        ClientSessionState bobState = new ClientSessionState();
+        try (RunningAuthServer server = new RunningAuthServer(users);
+             AuthClientService alice = new AuthClientService(
+                     new ClientConfig("127.0.0.1", server.port()),
+                     aliceState
+             );
+             AuthClientService bob = new AuthClientService(
+                     new ClientConfig("127.0.0.1", server.port()),
+                     bobState
+             )) {
+            alice.connectAsync().get(3, TimeUnit.SECONDS);
+            bob.connectAsync().get(3, TimeUnit.SECONDS);
+            alice.register("alice", "secret", "Alice").get(3, TimeUnit.SECONDS);
+            bob.register("bob", "secret", "Bob").get(3, TimeUnit.SECONDS);
+            alice.login("alice", "secret").get(3, TimeUnit.SECONDS);
+            bob.login("bob", "secret").get(3, TimeUnit.SECONDS);
+
+            assertEquals(2, alice.getOnlinePlayers().get(3, TimeUnit.SECONDS).players().size());
+            var created = alice.createRoom().get(3, TimeUnit.SECONDS).room();
+            assertEquals(0, created.players().getFirst().slotIndex());
+
+            var joined = bob.joinRoom(created.roomId()).get(3, TimeUnit.SECONDS).room();
+            assertEquals(2, joined.players().size());
+            assertEquals(1, joined.players().get(1).slotIndex());
+            await(() -> aliceState.room().map(room -> room.players().size() == 2).orElse(false));
+
+            bob.leaveRoom(created.roomId()).get(3, TimeUnit.SECONDS);
+            assertTrue(bobState.room().isEmpty());
+            await(() -> aliceState.room().map(room -> room.players().size() == 1).orElse(false));
+            assertEquals("Alice", aliceState.room().orElseThrow().players().getFirst().displayName());
+        }
+    }
+
+    @Test
+    void invitationReadyAndStartGameWorkEndToEndAcrossTwoClients() throws Exception {
+        InMemoryUserRepository users = new InMemoryUserRepository();
+        ClientSessionState aliceState = new ClientSessionState();
+        ClientSessionState bobState = new ClientSessionState();
+        try (RunningAuthServer server = new RunningAuthServer(users);
+             AuthClientService alice = new AuthClientService(
+                     new ClientConfig("127.0.0.1", server.port()),
+                     aliceState
+             );
+             AuthClientService bob = new AuthClientService(
+                     new ClientConfig("127.0.0.1", server.port()),
+                     bobState
+             )) {
+            alice.connectAsync().get(3, TimeUnit.SECONDS);
+            bob.connectAsync().get(3, TimeUnit.SECONDS);
+            alice.register("alice", "secret", "Alice").get(3, TimeUnit.SECONDS);
+            bob.register("bob", "secret", "Bob").get(3, TimeUnit.SECONDS);
+            alice.login("alice", "secret").get(3, TimeUnit.SECONDS);
+            bob.login("bob", "secret").get(3, TimeUnit.SECONDS);
+
+            var room = alice.createRoom().get(3, TimeUnit.SECONDS).room();
+            String bobPlayerId = bobState.profile().orElseThrow().playerId();
+            alice.invitePlayer(room.roomId(), bobPlayerId).get(3, TimeUnit.SECONDS);
+            await(() -> bobState.invitation().isPresent());
+            String rejectedInvitationId = bobState.invitation().orElseThrow().invitationId();
+            bob.rejectInvitation(rejectedInvitationId).get(3, TimeUnit.SECONDS);
+            assertTrue(bobState.invitation().isEmpty());
+
+            alice.invitePlayer(room.roomId(), bobPlayerId).get(3, TimeUnit.SECONDS);
+            await(() -> bobState.invitation().isPresent());
+            bob.acceptInvitation(bobState.invitation().orElseThrow().invitationId())
+                    .get(3, TimeUnit.SECONDS);
+            await(() -> aliceState.room().map(value -> value.players().size() == 2).orElse(false));
+
+            CompletionException nonHostFailure = assertThrows(
+                    CompletionException.class,
+                    () -> bob.startGame(room.roomId()).join()
+            );
+            ClientRequestException nonHost = assertInstanceOf(
+                    ClientRequestException.class,
+                    nonHostFailure.getCause()
+            );
+            assertEquals(ErrorCode.NOT_ROOM_HOST, nonHost.errorCode());
+
+            alice.setReady(room.roomId(), true).get(3, TimeUnit.SECONDS);
+            bob.setReady(room.roomId(), true).get(3, TimeUnit.SECONDS);
+            await(() -> aliceState.room()
+                    .map(value -> value.players().stream().allMatch(player -> player.ready()))
+                    .orElse(false));
+
+            var game = alice.startGame(room.roomId()).get(3, TimeUnit.SECONDS);
+            assertEquals(RoomState.PLAYING, game.roomState());
+            assertEquals(TurnState.WAITING_FOR_ROLL, game.turnState());
+            assertEquals("1", game.currentPlayerId());
+            assertEquals(4, game.participants().getFirst().pieces().size());
+            await(() -> bobState.gameState().isPresent());
+            assertEquals(game.matchId(), bobState.gameState().orElseThrow().matchId());
+            assertEquals(RoomState.PLAYING, bobState.gameState().orElseThrow().roomState());
+
+            CompletionException wrongTurnFailure = assertThrows(
+                    CompletionException.class,
+                    () -> bob.rollDice(room.roomId()).join()
+            );
+            ClientRequestException wrongTurn = assertInstanceOf(
+                    ClientRequestException.class,
+                    wrongTurnFailure.getCause()
+            );
+            assertEquals(ErrorCode.NOT_YOUR_TURN, wrongTurn.errorCode());
+
+            var six = alice.rollDice(room.roomId()).get(3, TimeUnit.SECONDS);
+            assertEquals(6, six.diceValue());
+            assertEquals(4, six.validPieceIds().size());
+            await(() -> bobState.gameState()
+                    .map(value -> value.turnState() == TurnState.WAITING_FOR_MOVE
+                            && Integer.valueOf(6).equals(value.diceValue()))
+                    .orElse(false));
+
+            String pieceId = six.validPieceIds().getFirst();
+            var spawn = alice.movePiece(room.roomId(), pieceId).get(3, TimeUnit.SECONDS);
+            assertEquals(PieceState.ON_TRACK, spawn.piece().state());
+            assertEquals(0, spawn.piece().stepCount());
+            assertTrue(spawn.bonusRoll());
+            assertEquals("1", spawn.gameState().currentPlayerId());
+            assertEquals(TurnState.WAITING_FOR_ROLL, spawn.gameState().turnState());
+
+            var three = alice.rollDice(room.roomId()).get(3, TimeUnit.SECONDS);
+            assertEquals(3, three.diceValue());
+            assertEquals(java.util.List.of(pieceId), three.validPieceIds());
+            var advanced = alice.movePiece(room.roomId(), pieceId).get(3, TimeUnit.SECONDS);
+            assertEquals(3, advanced.piece().stepCount());
+            assertFalse(advanced.bonusRoll());
+            assertEquals("2", advanced.gameState().currentPlayerId());
+            assertEquals(TurnState.WAITING_FOR_ROLL, advanced.gameState().turnState());
+            await(() -> bobState.gameState()
+                    .map(value -> "2".equals(value.currentPlayerId())
+                            && value.stateVersion() == advanced.gameState().stateVersion())
+                    .orElse(false));
+        }
+    }
+
     private static final class RunningAuthServer implements AutoCloseable {
         private final ClientSessionState clientSessionState = new ClientSessionState();
         private final SessionManager sessions = new SessionManager(Duration.ofSeconds(2));
         private final HeartbeatManager heartbeat = new HeartbeatManager(Duration.ofSeconds(30), 3);
+        private final RoomService rooms;
         private final TcpServer server;
 
         private RunningAuthServer(UserRepository users) throws Exception {
             AuthService authService = new AuthService(users, new TestPasswordHasher(), sessions);
+            ConnectionRegistry connections = new ConnectionRegistry();
+            LobbyService lobby = new LobbyService(sessions, connections);
+            rooms = new RoomService(
+                    sessions,
+                    connections,
+                    new SequenceDiceRoller(6, 3)
+            );
+            sessions.addEventListener(lobby::broadcastOnlinePlayers);
+            sessions.addEventListener(rooms::onSessionsChanged);
             AuthMessageHandler handler = new AuthMessageHandler(
                     authService,
                     sessions,
-                    SessionStateProvider.basic(),
-                    heartbeat
+                    session -> new vn.ptit.ltm.common.dto.session.ReconnectResult(
+                            true,
+                            session.presenceState(),
+                            rooms.roomForPlayer(session.user().id()).orElse(null),
+                            rooms.gameForPlayer(session.user().id()).orElse(null)
+                    ),
+                    heartbeat,
+                    lobby,
+                    rooms
             );
             server = new TcpServer(
                     0,
                     4,
                     handler,
                     new CompositeConnectionListener(
+                            connections,
                             heartbeat,
                             new SessionConnectionListener(sessions)
                     )
@@ -129,8 +293,35 @@ class AuthClientServiceIntegrationTest {
         public void close() {
             server.close();
             heartbeat.close();
+            rooms.close();
             sessions.close();
         }
+    }
+
+    private static final class SequenceDiceRoller implements DiceRoller {
+        private final ArrayDeque<Integer> values = new ArrayDeque<>();
+
+        private SequenceDiceRoller(int... diceValues) {
+            for (int diceValue : diceValues) {
+                values.addLast(diceValue);
+            }
+        }
+
+        @Override
+        public synchronized int roll() {
+            if (values.isEmpty()) {
+                throw new IllegalStateException("No deterministic dice value remains");
+            }
+            return values.removeFirst();
+        }
+    }
+
+    private static void await(BooleanSupplier condition) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
+        while (!condition.getAsBoolean() && System.nanoTime() < deadline) {
+            Thread.sleep(10);
+        }
+        assertTrue(condition.getAsBoolean(), "Condition was not met before timeout");
     }
 
     private static final class TestPasswordHasher implements PasswordHasher {
