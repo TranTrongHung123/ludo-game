@@ -7,8 +7,12 @@ import vn.ptit.ltm.server.repository.UserAccountRecord;
 import vn.ptit.ltm.server.service.AuthException;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -68,6 +72,29 @@ class SessionManagerTest {
     }
 
     @Test
+    void reconnectAtExpiredDeadlinePublishesSessionRemovalEvenBeforeSchedulerCallback() throws Exception {
+        MutableClock clock = new MutableClock(Instant.parse("2026-01-01T00:00:00Z"));
+        ScheduledThreadPoolExecutor scheduler = new ScheduledThreadPoolExecutor(1);
+        try (SessionManager sessions = new SessionManager(Duration.ofSeconds(60), clock, scheduler)) {
+            PlayerSession session = sessions.createSession(user(1), "connection-1");
+            AtomicInteger events = new AtomicInteger();
+            sessions.addEventListener(events::incrementAndGet);
+            sessions.disconnect("connection-1");
+            assertTrue(waitUntil(() -> events.get() == 1, Duration.ofSeconds(2)));
+
+            clock.advance(Duration.ofSeconds(60));
+            AuthException expired = assertThrows(
+                    AuthException.class,
+                    () -> sessions.reconnect(session.sessionId(), "connection-2")
+            );
+
+            assertEquals(ErrorCode.SESSION_EXPIRED, expired.errorCode());
+            assertTrue(waitUntil(() -> events.get() == 2, Duration.ofSeconds(2)));
+            assertEquals(0, sessions.activeSessionCount());
+        }
+    }
+
+    @Test
     void logoutImmediatelyCleansUpSession() {
         try (SessionManager sessions = new SessionManager(Duration.ofSeconds(1))) {
             PlayerSession session = sessions.createSession(user(1), "connection-1");
@@ -104,5 +131,32 @@ class SessionManagerTest {
             Thread.sleep(10);
         }
         return condition.getAsBoolean();
+    }
+
+    private static final class MutableClock extends Clock {
+        private Instant instant;
+
+        private MutableClock(Instant instant) {
+            this.instant = instant;
+        }
+
+        void advance(Duration duration) {
+            instant = instant.plus(duration);
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneId.of("UTC");
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return instant;
+        }
     }
 }

@@ -26,6 +26,8 @@ import vn.ptit.ltm.common.protocol.MessageFactory;
 import vn.ptit.ltm.common.protocol.PayloadMapper;
 import vn.ptit.ltm.server.service.AuthException;
 import vn.ptit.ltm.server.service.AuthService;
+import vn.ptit.ltm.server.service.MatchService;
+import vn.ptit.ltm.server.service.RankingService;
 import vn.ptit.ltm.server.service.ServiceException;
 import vn.ptit.ltm.server.lobby.LobbyService;
 import vn.ptit.ltm.server.room.RoomService;
@@ -45,6 +47,8 @@ public final class AuthMessageHandler implements MessageHandler {
     private final HeartbeatManager heartbeatManager;
     private final LobbyService lobbyService;
     private final RoomService roomService;
+    private final MatchService matchService;
+    private final RankingService rankingService;
     private final PayloadMapper payloadMapper;
     private final MessageFactory messageFactory;
 
@@ -54,7 +58,7 @@ public final class AuthMessageHandler implements MessageHandler {
             SessionStateProvider sessionStateProvider,
             HeartbeatManager heartbeatManager
     ) {
-        this(authService, sessionManager, sessionStateProvider, heartbeatManager, null, null);
+        this(authService, sessionManager, sessionStateProvider, heartbeatManager, null, null, null, null);
     }
 
     public AuthMessageHandler(
@@ -64,7 +68,7 @@ public final class AuthMessageHandler implements MessageHandler {
             HeartbeatManager heartbeatManager,
             LobbyService lobbyService
     ) {
-        this(authService, sessionManager, sessionStateProvider, heartbeatManager, lobbyService, null);
+        this(authService, sessionManager, sessionStateProvider, heartbeatManager, lobbyService, null, null, null);
     }
 
     public AuthMessageHandler(
@@ -75,12 +79,36 @@ public final class AuthMessageHandler implements MessageHandler {
             LobbyService lobbyService,
             RoomService roomService
     ) {
+        this(
+                authService,
+                sessionManager,
+                sessionStateProvider,
+                heartbeatManager,
+                lobbyService,
+                roomService,
+                null,
+                null
+        );
+    }
+
+    public AuthMessageHandler(
+            AuthService authService,
+            SessionManager sessionManager,
+            SessionStateProvider sessionStateProvider,
+            HeartbeatManager heartbeatManager,
+            LobbyService lobbyService,
+            RoomService roomService,
+            MatchService matchService,
+            RankingService rankingService
+    ) {
         this.authService = Objects.requireNonNull(authService, "authService");
         this.sessionManager = Objects.requireNonNull(sessionManager, "sessionManager");
         this.sessionStateProvider = Objects.requireNonNull(sessionStateProvider, "sessionStateProvider");
         this.heartbeatManager = Objects.requireNonNull(heartbeatManager, "heartbeatManager");
         this.lobbyService = lobbyService;
         this.roomService = roomService;
+        this.matchService = matchService;
+        this.rankingService = rankingService;
         JsonMessageCodec codec = new JsonMessageCodec();
         this.payloadMapper = new PayloadMapper(codec.objectMapper());
         this.messageFactory = new MessageFactory(codec.objectMapper());
@@ -112,6 +140,8 @@ public final class AuthMessageHandler implements MessageHandler {
                 case LOGOUT -> handleLogout(connection, message);
                 case RECONNECT -> handleReconnect(connection, message);
                 case GET_ONLINE_PLAYERS -> handleGetOnlinePlayers(connection, message);
+                case GET_RANKING -> handleGetRanking(connection, message);
+                case GET_MATCH_HISTORY -> handleGetMatchHistory(connection, message);
                 case CREATE_ROOM -> handleCreateRoom(connection, message);
                 case JOIN_ROOM -> handleJoinRoom(connection, message);
                 case LEAVE_ROOM -> handleLeaveRoom(connection, message);
@@ -188,10 +218,10 @@ public final class AuthMessageHandler implements MessageHandler {
 
     private void handleLogout(ClientConnection connection, MessageEnvelope message) throws IOException {
         PlayerSession session = sessionManager.requireAuthenticated(message.sessionId(), connection.id());
+        sessionManager.logout(message.sessionId(), connection.id());
         if (roomService != null) {
             roomService.leaveForSessionEnd(session.user().id());
         }
-        sessionManager.logout(message.sessionId(), connection.id());
         connection.send(messageFactory.response(
                 MessageType.LOGOUT,
                 message.requestId(),
@@ -221,6 +251,34 @@ public final class AuthMessageHandler implements MessageHandler {
                 MessageType.ONLINE_PLAYERS_UPDATED,
                 message.requestId(),
                 lobbyService.onlinePlayers()
+        ));
+    }
+
+    private void handleGetRanking(ClientConnection connection, MessageEnvelope message)
+            throws IOException {
+        sessionManager.requireAuthenticated(message.sessionId(), connection.id());
+        payloadMapper.fromTree(message.data(), EmptyPayload.class);
+        if (rankingService == null) {
+            throw new AuthException(ErrorCode.INTERNAL_SERVER_ERROR, "Ranking service is unavailable");
+        }
+        connection.send(messageFactory.response(
+                MessageType.RANKING_RESULT,
+                message.requestId(),
+                rankingService.ranking()
+        ));
+    }
+
+    private void handleGetMatchHistory(ClientConnection connection, MessageEnvelope message)
+            throws IOException {
+        PlayerSession session = sessionManager.requireAuthenticated(message.sessionId(), connection.id());
+        payloadMapper.fromTree(message.data(), EmptyPayload.class);
+        if (matchService == null) {
+            throw new AuthException(ErrorCode.INTERNAL_SERVER_ERROR, "Match service is unavailable");
+        }
+        connection.send(messageFactory.response(
+                MessageType.MATCH_HISTORY_RESULT,
+                message.requestId(),
+                matchService.matchHistory(session.user().id())
         ));
     }
 
@@ -261,6 +319,7 @@ public final class AuthMessageHandler implements MessageHandler {
                 EmptyPayload.INSTANCE
         ));
         roomService.broadcastRoom(request.roomId());
+        roomService.broadcastGameUpdated(request.roomId());
     }
 
     private void handleInvitePlayer(ClientConnection connection, MessageEnvelope message)

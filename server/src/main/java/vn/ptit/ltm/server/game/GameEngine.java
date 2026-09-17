@@ -256,6 +256,105 @@ public final class GameEngine {
         return beginNextTurn(state, now, state.stateVersion() + 1);
     }
 
+    /**
+     * Loại một participant ACTIVE khỏi trận và đánh giá lại điều kiện kết thúc ngay trong
+     * cùng một phép chuyển trạng thái. Hàm này không phụ thuộc session/network để mọi
+     * nguyên nhân bỏ cuộc (quit hoặc hết grace period) dùng chung một luật authoritative.
+     */
+    public static GameStateDto forfeitParticipant(
+            GameStateDto state,
+            String playerId,
+            Instant now
+    ) {
+        return forfeitParticipants(state, List.of(playerId), now);
+    }
+
+    /**
+     * Xử lý đồng thời nhiều session cùng hết grace period. Tất cả participant mục tiêu
+     * được đánh dấu FORFEITED trước khi xét cascading, tránh gán chiến thắng nhầm cho
+     * một người cũng đã hết hạn nhưng event session bị gộp trong cùng snapshot.
+     */
+    public static GameStateDto forfeitParticipants(
+            GameStateDto state,
+            List<String> playerIds,
+            Instant now
+    ) {
+        Objects.requireNonNull(state, "state");
+        Objects.requireNonNull(playerIds, "playerIds");
+        Objects.requireNonNull(now, "now");
+        requirePlaying(state);
+        if (playerIds.isEmpty() || playerIds.stream().anyMatch(Objects::isNull)) {
+            throw new IllegalArgumentException("At least one player ID is required");
+        }
+        Set<String> uniquePlayerIds = new HashSet<>(playerIds);
+        if (uniquePlayerIds.size() != playerIds.size()) {
+            throw new IllegalArgumentException("Player IDs must be unique");
+        }
+
+        List<MatchParticipantDto> participants = new ArrayList<>(state.participants());
+        for (String playerId : playerIds) {
+            int forfeitedIndex = -1;
+            for (int index = 0; index < participants.size(); index++) {
+                if (participants.get(index).playerId().equals(playerId)) {
+                    forfeitedIndex = index;
+                    break;
+                }
+            }
+            if (forfeitedIndex < 0) {
+                throw new GameException(ErrorCode.INVALID_GAME_STATE, "Participant does not exist");
+            }
+
+            MatchParticipantDto forfeited = participants.get(forfeitedIndex);
+            if (forfeited.matchStatus() != MatchParticipantStatus.ACTIVE) {
+                throw new GameException(ErrorCode.INVALID_GAME_STATE, "Only an ACTIVE participant can forfeit");
+            }
+            participants.set(
+                    forfeitedIndex,
+                    forfeitParticipant(forfeited, nextWorstRank(participants))
+            );
+        }
+
+        // Quân của người bỏ cuộc đã được đưa khỏi bàn trước khi xét người ACTIVE cuối cùng.
+        participants = finishIfOnlyOneActive(participants);
+        boolean gameFinished = participants.stream()
+                .noneMatch(participant -> participant.matchStatus() == MatchParticipantStatus.ACTIVE);
+        if (gameFinished) {
+            return copyState(
+                    state,
+                    RoomState.FINISHED,
+                    null,
+                    null,
+                    TurnState.FINISHED,
+                    null,
+                    List.of(),
+                    0L,
+                    null,
+                    participants,
+                    state.stateVersion() + 1
+            );
+        }
+
+        if (uniquePlayerIds.contains(state.currentPlayerId())) {
+            // Chỉ đổi lượt khi chính người đang giữ lượt bị loại; deadline mới bắt đầu từ Server.
+            return beginNextTurn(state, participants, now, state.stateVersion() + 1);
+        }
+
+        // Người bị loại không giữ lượt nên phase và deadline hiện tại phải được bảo toàn.
+        return copyState(
+                state,
+                RoomState.PLAYING,
+                state.currentPlayerId(),
+                state.currentSlot(),
+                state.turnState(),
+                state.diceValue(),
+                state.validPieceIds(),
+                state.phaseDurationMillis(),
+                state.serverDeadlineEpochMillis(),
+                participants,
+                state.stateVersion() + 1
+        );
+    }
+
     private static boolean isValidMove(GameStateDto state, PieceDto piece, int diceValue) {
         if (piece.state() == PieceState.FINISHED) {
             return false;
@@ -457,6 +556,26 @@ public final class GameEngine {
         );
     }
 
+    /**
+     * Gán hạng thấp nhất còn trống, điểm 0 và đưa toàn bộ quân khỏi các ô đang chiếm chỗ.
+     */
+    private static MatchParticipantDto forfeitParticipant(
+            MatchParticipantDto participant,
+            int rank
+    ) {
+        return new MatchParticipantDto(
+                participant.playerId(),
+                participant.displayName(),
+                participant.slotIndex(),
+                participant.color(),
+                participant.presenceState(),
+                MatchParticipantStatus.FORFEITED,
+                rank,
+                ZERO_SCORE,
+                participant.pieces().stream().map(GameEngine::sendToYard).toList()
+        );
+    }
+
     private static List<MatchParticipantDto> finishIfOnlyOneActive(
             List<MatchParticipantDto> participants
     ) {
@@ -485,6 +604,20 @@ public final class GameEngine {
                 .filter(Objects::nonNull)
                 .forEach(assigned::add);
         for (int rank = 1; rank <= participants.size(); rank++) {
+            if (!assigned.contains(rank)) {
+                return rank;
+            }
+        }
+        throw new GameException(ErrorCode.INVALID_GAME_STATE, "No rank remains available");
+    }
+
+    private static int nextWorstRank(List<MatchParticipantDto> participants) {
+        Set<Integer> assigned = new HashSet<>();
+        participants.stream()
+                .map(MatchParticipantDto::rank)
+                .filter(Objects::nonNull)
+                .forEach(assigned::add);
+        for (int rank = participants.size(); rank >= 1; rank--) {
             if (!assigned.contains(rank)) {
                 return rank;
             }

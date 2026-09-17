@@ -24,6 +24,7 @@ class DatabaseMigrationIntegrationTest {
             assertTrue(tableNames(database).containsAll(
                     Set.of("flyway_schema_history", "match_players", "matches", "users")
             ));
+            assertTrue(columnNames(database, "matches").contains("public_id"));
 
             JdbcUserRepository repository = new JdbcUserRepository(database.dataSource());
             String username = "migration_test_" + UUID.randomUUID().toString().replace("-", "");
@@ -56,5 +57,21 @@ class DatabaseMigrationIntegrationTest {
             }
         }
         return tables;
+    }
+
+    private static Set<String> columnNames(DatabaseManager database, String tableName) throws Exception {
+        Set<String> columns = new HashSet<>();
+        try (Connection connection = database.connection();
+             ResultSet resultSet = connection.getMetaData().getColumns(
+                     connection.getCatalog(),
+                     null,
+                     tableName,
+                     "%"
+             )) {
+            while (resultSet.next()) {
+                columns.add(resultSet.getString("COLUMN_NAME"));
+            }
+        }
+        return columns;
     }
 }

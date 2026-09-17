@@ -3,8 +3,10 @@ package vn.ptit.ltm.server.room;
 import vn.ptit.ltm.common.dto.room.RoomDto;
 import vn.ptit.ltm.common.dto.room.RoomPlayerDto;
 import vn.ptit.ltm.common.dto.game.DiceResultDto;
+import vn.ptit.ltm.common.dto.game.GameOverDto;
 import vn.ptit.ltm.common.dto.game.GameStateDto;
 import vn.ptit.ltm.common.dto.game.MatchParticipantDto;
+import vn.ptit.ltm.common.dto.game.MatchStandingDto;
 import vn.ptit.ltm.common.dto.game.MovePieceResultDto;
 import vn.ptit.ltm.common.dto.game.PieceDto;
 import vn.ptit.ltm.common.dto.game.TurnTimeoutDto;
@@ -20,6 +22,8 @@ import vn.ptit.ltm.common.model.GameConstants;
 import vn.ptit.ltm.server.game.DiceRoller;
 import vn.ptit.ltm.server.game.GameEngine;
 import vn.ptit.ltm.server.game.SpecialCellLayout;
+import vn.ptit.ltm.server.repository.CompletedMatchPlayerRecord;
+import vn.ptit.ltm.server.repository.CompletedMatchRecord;
 import vn.ptit.ltm.server.session.PlayerSession;
 
 import java.math.BigDecimal;
@@ -27,10 +31,12 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.UUID;
 
@@ -38,11 +44,15 @@ final class GameRoom {
     private final String roomId;
     private final ReentrantLock lock = new ReentrantLock();
     private final Map<Integer, RoomMember> membersBySlot = new HashMap<>();
+    private final Set<Long> departedUserIds = new HashSet<>();
     private RoomState state = RoomState.WAITING;
     private long nextJoinOrder;
     private long hostUserId;
     private boolean closed;
     private GameStateDto gameState;
+    private Instant matchStartedAt;
+    private Instant matchEndedAt;
+    private GameOverDto persistedGameOver;
 
     GameRoom(String roomId, PlayerSession creator) {
         this.roomId = roomId;
@@ -159,6 +169,9 @@ final class GameRoom {
                     .toList();
             RoomMember first = orderedMembers.getFirst();
             state = RoomState.PLAYING;
+            matchStartedAt = now;
+            matchEndedAt = null;
+            persistedGameOver = null;
             gameState = new GameStateDto(
                     roomId,
                     UUID.randomUUID().toString(),
@@ -216,7 +229,7 @@ final class GameRoom {
                     pieceId,
                     now
             );
-            gameState = outcome.gameState();
+            recordGameState(outcome.gameState(), now);
             state = gameState.roomState();
             MovePieceResultDto result = outcome.result();
             return new MovePieceResultDto(
@@ -227,6 +240,174 @@ final class GameRoom {
                     result.bonusRoll(),
                     gameSnapshotLocked(presenceByUserId)
             );
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * Gỡ một người khỏi membership sống sau khi trận đã bắt đầu nhưng vẫn giữ
+     * RoomMember để tạo bảng hạng và lưu kết quả trận. Participant trong Game State
+     * vì thế không bị xóa hoặc đổi thứ hạng khi người chơi quay về Lobby.
+     */
+    boolean departAfterStart(long userId) {
+        lock.lock();
+        try {
+            if (state == RoomState.WAITING || closed || departedUserIds.contains(userId)) {
+                return false;
+            }
+            RoomMember member = membersBySlot.values().stream()
+                    .filter(candidate -> candidate.userId() == userId)
+                    .findFirst()
+                    .orElse(null);
+            if (member == null) {
+                return false;
+            }
+            departedUserIds.add(userId);
+            List<RoomMember> remaining = liveMembersByJoinOrder();
+            if (remaining.isEmpty()) {
+                closed = true;
+                return true;
+            }
+            if (hostUserId == userId) {
+                hostUserId = remaining.getFirst().userId();
+            }
+            return true;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * Chuyển người chơi ACTIVE sang FORFEITED dưới lock riêng của phòng. Nếu người bị
+     * loại đang giữ lượt, GameEngine sẽ tạo lượt kế tiếp; nếu chỉ còn một người ACTIVE,
+     * trận kết thúc ngay theo luật cascading.
+     */
+    Optional<GameStateDto> forfeitActivePlayer(
+            long userId,
+            Instant now,
+            Map<Long, PlayerPresenceState> presenceByUserId
+    ) {
+        return forfeitActivePlayers(List.of(userId), now, presenceByUserId);
+    }
+
+    /**
+     * Gom các session cùng hết hạn vào một transition dưới lock phòng để chỉ đánh giá
+     * cascading sau khi toàn bộ participant tương ứng đã thành FORFEITED.
+     */
+    Optional<GameStateDto> forfeitActivePlayers(
+            List<Long> userIds,
+            Instant now,
+            Map<Long, PlayerPresenceState> presenceByUserId
+    ) {
+        lock.lock();
+        try {
+            if (gameState == null || gameState.roomState() != RoomState.PLAYING) {
+                return Optional.empty();
+            }
+            List<String> activePlayerIds = userIds.stream()
+                    .map(String::valueOf)
+                    .filter(playerId -> gameState.participants().stream().anyMatch(participant ->
+                            participant.playerId().equals(playerId)
+                                    && participant.matchStatus() == MatchParticipantStatus.ACTIVE
+                    ))
+                    .distinct()
+                    .toList();
+            if (activePlayerIds.isEmpty()) {
+                return Optional.empty();
+            }
+            recordGameState(GameEngine.forfeitParticipants(gameState, activePlayerIds, now), now);
+            state = gameState.roomState();
+            return Optional.of(gameSnapshotLocked(presenceByUserId));
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * Tạo bảng kết quả từ trạng thái cuối cùng trong RAM. Điểm tổng ở đây là ảnh chụp
+     * trước trận cộng điểm vừa nhận; việc ghi lâu dài vẫn thuộc tầng persistence.
+     */
+    Optional<GameOverDto> gameOverSnapshot() {
+        lock.lock();
+        try {
+            if (gameState == null || gameState.roomState() != RoomState.FINISHED) {
+                return Optional.empty();
+            }
+            if (persistedGameOver != null) {
+                return Optional.of(persistedGameOver);
+            }
+            List<MatchStandingDto> standings = gameState.participants().stream()
+                    .sorted(Comparator.comparingInt(participant -> Objects.requireNonNull(participant.rank())))
+                    .map(participant -> {
+                        RoomMember member = membersBySlot.get(participant.slotIndex());
+                        BigDecimal scoreEarned = Objects.requireNonNull(participant.scoreEarned());
+                        return new MatchStandingDto(
+                                participant.playerId(),
+                                participant.displayName(),
+                                participant.color(),
+                                Objects.requireNonNull(participant.rank()),
+                                scoreEarned,
+                                member.totalScore().add(scoreEarned),
+                                participant.matchStatus()
+                        );
+                    })
+                    .toList();
+            return Optional.of(new GameOverDto(roomId, gameState.matchId(), standings));
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    Optional<CompletedMatchRecord> completedMatchSnapshot() {
+        lock.lock();
+        try {
+            if (gameState == null
+                    || gameState.roomState() != RoomState.FINISHED
+                    || matchStartedAt == null
+                    || matchEndedAt == null) {
+                return Optional.empty();
+            }
+            return Optional.of(new CompletedMatchRecord(
+                    gameState.matchId(),
+                    matchStartedAt,
+                    matchEndedAt,
+                    gameState.participants().stream()
+                            .map(participant -> new CompletedMatchPlayerRecord(
+                                    Long.parseLong(participant.playerId()),
+                                    participant.displayName(),
+                                    participant.color(),
+                                    Objects.requireNonNull(participant.rank()),
+                                    Objects.requireNonNull(participant.scoreEarned()),
+                                    participant.matchStatus()
+                            ))
+                            .toList()
+            ));
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    void markMatchPersisted(GameOverDto gameOver) {
+        Objects.requireNonNull(gameOver, "gameOver");
+        lock.lock();
+        try {
+            if (gameState == null
+                    || gameState.roomState() != RoomState.FINISHED
+                    || !roomId.equals(gameOver.roomId())
+                    || !gameState.matchId().equals(gameOver.matchId())) {
+                throw new IllegalArgumentException("Game-over result does not match this room");
+            }
+            persistedGameOver = gameOver;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    boolean matchPersisted() {
+        lock.lock();
+        try {
+            return persistedGameOver != null;
         } finally {
             lock.unlock();
         }
@@ -320,7 +501,8 @@ final class GameRoom {
     boolean hasPlayer(long userId) {
         lock.lock();
         try {
-            return membersBySlot.values().stream().anyMatch(member -> member.userId() == userId);
+            return !departedUserIds.contains(userId)
+                    && membersBySlot.values().stream().anyMatch(member -> member.userId() == userId);
         } finally {
             lock.unlock();
         }
@@ -330,6 +512,7 @@ final class GameRoom {
         lock.lock();
         try {
             return membersBySlot.values().stream()
+                    .filter(member -> !departedUserIds.contains(member.userId()))
                     .sorted(Comparator.comparingInt(RoomMember::slotIndex))
                     .map(RoomMember::userId)
                     .toList();
@@ -345,6 +528,7 @@ final class GameRoom {
                 throw new RoomException(ErrorCode.ROOM_NOT_FOUND, "Room does not exist");
             }
             List<RoomPlayerDto> players = membersBySlot.values().stream()
+                    .filter(member -> !departedUserIds.contains(member.userId()))
                     .sorted(Comparator.comparingInt(RoomMember::slotIndex))
                     .map(member -> new RoomPlayerDto(
                             Long.toString(member.userId()),
@@ -458,6 +642,13 @@ final class GameRoom {
         return Optional.of(new TimeoutOutcome(timeout, gameSnapshotLocked(presenceByUserId)));
     }
 
+    private void recordGameState(GameStateDto replacement, Instant now) {
+        gameState = Objects.requireNonNull(replacement, "replacement");
+        if (gameState.roomState() == RoomState.FINISHED && matchEndedAt == null) {
+            matchEndedAt = Objects.requireNonNull(now, "now");
+        }
+    }
+
     private void requireOpenWaiting() {
         if (closed) {
             throw new RoomException(ErrorCode.ROOM_NOT_FOUND, "Room does not exist");
@@ -499,6 +690,7 @@ final class GameRoom {
         return new RoomMember(
                 session.user().id(),
                 session.user().displayName(),
+                session.user().score(),
                 slot,
                 joinOrder,
                 false
@@ -508,13 +700,21 @@ final class GameRoom {
     private record RoomMember(
             long userId,
             String displayName,
+            BigDecimal totalScore,
             int slotIndex,
             long joinOrder,
             boolean ready
     ) {
         RoomMember withReady(boolean newReady) {
-            return new RoomMember(userId, displayName, slotIndex, joinOrder, newReady);
+            return new RoomMember(userId, displayName, totalScore, slotIndex, joinOrder, newReady);
         }
+    }
+
+    private List<RoomMember> liveMembersByJoinOrder() {
+        return membersBySlot.values().stream()
+                .filter(member -> !departedUserIds.contains(member.userId()))
+                .sorted(Comparator.comparingLong(RoomMember::joinOrder))
+                .toList();
     }
 
     record TimeoutExpectation(

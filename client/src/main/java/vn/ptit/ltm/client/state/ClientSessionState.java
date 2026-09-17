@@ -7,7 +7,9 @@ import vn.ptit.ltm.common.dto.room.RoomDto;
 import vn.ptit.ltm.common.dto.room.InvitationDto;
 import vn.ptit.ltm.common.dto.game.GameStateDto;
 import vn.ptit.ltm.common.dto.game.DiceResultDto;
+import vn.ptit.ltm.common.dto.game.GameOverDto;
 import vn.ptit.ltm.common.dto.game.TurnTimeoutDto;
+import vn.ptit.ltm.common.dto.session.ReconnectResult;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -21,6 +23,7 @@ public final class ClientSessionState {
     private GameStateDto gameState;
     private DiceResultDto lastDiceResult;
     private TurnTimeoutDto lastTurnTimeout;
+    private GameOverDto gameOver;
 
     public synchronized void authenticate(LoginResult result) {
         Objects.requireNonNull(result, "result");
@@ -49,6 +52,21 @@ public final class ClientSessionState {
 
     public synchronized void updateOnlinePlayers(OnlinePlayersPayload payload) {
         onlinePlayers = Objects.requireNonNull(payload, "payload");
+        if (profile != null) {
+            payload.players().stream()
+                    .filter(player -> player.playerId().equals(profile.playerId()))
+                    .findFirst()
+                    .ifPresent(player -> profile = new PlayerProfileDto(
+                            profile.playerId(),
+                            profile.username(),
+                            profile.displayName(),
+                            player.totalScore(),
+                            player.firstPlaceCount(),
+                            profile.totalGames(),
+                            profile.wins(),
+                            profile.losses()
+                    ));
+        }
     }
 
     public synchronized Optional<RoomDto> room() {
@@ -64,6 +82,7 @@ public final class ClientSessionState {
         gameState = null;
         lastDiceResult = null;
         lastTurnTimeout = null;
+        gameOver = null;
     }
 
     public synchronized Optional<InvitationDto> invitation() {
@@ -92,8 +111,34 @@ public final class ClientSessionState {
         if (gameState == null || !gameState.matchId().equals(updatedGameState.matchId())) {
             lastDiceResult = null;
             lastTurnTimeout = null;
+            gameOver = null;
         }
         gameState = updatedGameState;
+    }
+
+    /**
+     * Thay snapshot cục bộ bằng full state authoritative nhận được sau reconnect.
+     * Các event tạm của connection cũ bị xóa để UI không hiển thị lại dice/timeout cũ.
+     */
+    public synchronized void restoreAfterReconnect(ReconnectResult result) {
+        Objects.requireNonNull(result, "result");
+        if (!result.restored()) {
+            throw new IllegalArgumentException("Reconnect result was not restored");
+        }
+        room = result.room();
+        GameStateDto restoredGameState = result.gameState();
+        if (restoredGameState == null) {
+            gameState = null;
+        } else if (gameState == null
+                || !gameState.matchId().equals(restoredGameState.matchId())
+                || restoredGameState.stateVersion() >= gameState.stateVersion()) {
+            // Event timeout/move mới hơn có thể đến trước RECONNECT_RESULT do hai thread Server gửi đồng thời.
+            gameState = restoredGameState;
+        }
+        invitation = null;
+        lastDiceResult = null;
+        lastTurnTimeout = null;
+        gameOver = null;
     }
 
     public synchronized Optional<DiceResultDto> lastDiceResult() {
@@ -112,6 +157,14 @@ public final class ClientSessionState {
         lastTurnTimeout = Objects.requireNonNull(timeout, "timeout");
     }
 
+    public synchronized Optional<GameOverDto> gameOver() {
+        return Optional.ofNullable(gameOver);
+    }
+
+    public synchronized void updateGameOver(GameOverDto result) {
+        gameOver = Objects.requireNonNull(result, "result");
+    }
+
     public synchronized void clear() {
         sessionId = null;
         profile = null;
@@ -121,5 +174,6 @@ public final class ClientSessionState {
         gameState = null;
         lastDiceResult = null;
         lastTurnTimeout = null;
+        gameOver = null;
     }
 }

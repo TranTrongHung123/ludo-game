@@ -78,6 +78,30 @@ final class RoomManager {
         return Optional.of(room);
     }
 
+    /**
+     * Gỡ mapping của người đã Quit hoặc rời một trận kết thúc. GameRoom vẫn giữ
+     * dữ liệu participant lịch sử cho tới khi thành viên sống cuối cùng rời phòng.
+     */
+    Optional<GameRoom> departCurrent(long userId) {
+        String roomId = roomIdByUserId.get(userId);
+        if (roomId == null) {
+            return Optional.empty();
+        }
+        GameRoom room = roomsById.get(roomId);
+        if (room == null) {
+            roomIdByUserId.remove(userId, roomId);
+            return Optional.empty();
+        }
+        if (!room.departAfterStart(userId)) {
+            return Optional.empty();
+        }
+        roomIdByUserId.remove(userId, roomId);
+        if (room.isClosed()) {
+            roomsById.remove(roomId, room);
+        }
+        return Optional.of(room);
+    }
+
     Optional<GameRoom> findByPlayer(long userId) {
         String roomId = roomIdByUserId.get(userId);
         if (roomId == null) {

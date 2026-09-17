@@ -16,6 +16,8 @@ import vn.ptit.ltm.common.dto.auth.LoginResult;
 import vn.ptit.ltm.common.dto.auth.RegisterRequest;
 import vn.ptit.ltm.common.dto.auth.RegisterResult;
 import vn.ptit.ltm.common.dto.lobby.OnlinePlayersPayload;
+import vn.ptit.ltm.common.dto.ranking.MatchHistoryPayload;
+import vn.ptit.ltm.common.dto.ranking.RankingPayload;
 import vn.ptit.ltm.common.dto.room.CreateRoomRequest;
 import vn.ptit.ltm.common.dto.room.JoinRoomRequest;
 import vn.ptit.ltm.common.dto.room.LeaveRoomRequest;
@@ -27,12 +29,16 @@ import vn.ptit.ltm.common.dto.room.SetReadyRequest;
 import vn.ptit.ltm.common.dto.room.StartGameRequest;
 import vn.ptit.ltm.common.dto.game.GameStateDto;
 import vn.ptit.ltm.common.dto.game.DiceResultDto;
+import vn.ptit.ltm.common.dto.game.GameOverDto;
 import vn.ptit.ltm.common.dto.game.MovePieceRequest;
 import vn.ptit.ltm.common.dto.game.MovePieceResultDto;
 import vn.ptit.ltm.common.dto.game.RollDiceRequest;
 import vn.ptit.ltm.common.dto.game.TurnTimeoutDto;
+import vn.ptit.ltm.common.dto.session.ReconnectRequest;
+import vn.ptit.ltm.common.dto.session.ReconnectResult;
 import vn.ptit.ltm.common.enums.MessageType;
 import vn.ptit.ltm.common.error.ErrorCode;
+import vn.ptit.ltm.common.model.GameConstants;
 import vn.ptit.ltm.common.protocol.JsonMessageCodec;
 import vn.ptit.ltm.common.protocol.MessageEnvelope;
 import vn.ptit.ltm.common.protocol.MessageFactory;
@@ -48,13 +54,16 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 public final class AuthClientService implements AutoCloseable, ClientMessageListener {
     private static final Logger LOGGER = LoggerFactory.getLogger(AuthClientService.class);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration RECONNECT_RETRY_DELAY = Duration.ofMillis(500);
 
     private final ClientConfig config;
     private final ClientSessionState sessionState;
@@ -62,6 +71,7 @@ public final class AuthClientService implements AutoCloseable, ClientMessageList
     private final MessageFactory messageFactory;
     private final PayloadMapper payloadMapper;
     private final ExecutorService requestExecutor;
+    private final ScheduledExecutorService reconnectScheduler;
     private final ConcurrentHashMap<String, CompletableFuture<MessageEnvelope>> pendingRequests =
             new ConcurrentHashMap<>();
     private final CopyOnWriteArrayList<Consumer<ConnectionState>> connectionListeners =
@@ -70,6 +80,7 @@ public final class AuthClientService implements AutoCloseable, ClientMessageList
             new ConcurrentHashMap<>();
     private final Object connectionLock = new Object();
     private final AtomicBoolean closed = new AtomicBoolean();
+    private final AtomicLong reconnectGeneration = new AtomicLong();
 
     private volatile ConnectionState connectionState = ConnectionState.DISCONNECTED;
     private CompletableFuture<Void> connectionAttempt;
@@ -85,13 +96,24 @@ public final class AuthClientService implements AutoCloseable, ClientMessageList
             thread.setDaemon(true);
             return thread;
         });
+        this.reconnectScheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "client-reconnect");
+            thread.setDaemon(true);
+            return thread;
+        });
         this.tcpClient = new TcpClient(this);
     }
 
+    /**
+     * Mở kết nối TCP và, nếu client đã đăng nhập, hoàn tất RECONNECT trước khi công bố
+     * trạng thái CONNECTED. Nhờ đó UI không mở lại nút Roll/Move trên một connection
+     * chưa được Server gắn với session cũ.
+     */
     public CompletableFuture<Void> connectAsync() {
         synchronized (connectionLock) {
             ensureOpen();
-            if (tcpClient.isConnected()) {
+            if (tcpClient.isConnected()
+                    && (!sessionState.isAuthenticated() || connectionState == ConnectionState.CONNECTED)) {
                 return CompletableFuture.completedFuture(null);
             }
             if (connectionAttempt != null && !connectionAttempt.isDone()) {
@@ -99,17 +121,27 @@ public final class AuthClientService implements AutoCloseable, ClientMessageList
             }
 
             updateConnectionState(ConnectionState.CONNECTING);
-            connectionAttempt = CompletableFuture.runAsync(() -> {
-                try {
-                    tcpClient.connect(config.serverHost(), config.serverPort());
-                } catch (IOException exception) {
-                    throw new CompletionException(exception);
-                }
-            }, requestExecutor).whenComplete((ignored, failure) -> {
-                updateConnectionState(
-                        failure == null ? ConnectionState.CONNECTED : ConnectionState.DISCONNECTED
-                );
-            });
+            CompletableFuture<Void> transportReady = tcpClient.isConnected()
+                    ? CompletableFuture.completedFuture(null)
+                    : CompletableFuture.runAsync(() -> {
+                        try {
+                            tcpClient.connect(config.serverHost(), config.serverPort());
+                        } catch (IOException exception) {
+                            throw new CompletionException(exception);
+                        }
+                    }, requestExecutor);
+            connectionAttempt = transportReady
+                    .thenCompose(ignored -> sessionState.isAuthenticated()
+                            ? reconnectAuthenticatedSession()
+                            : CompletableFuture.completedFuture(null))
+                    .whenComplete((ignored, failure) -> {
+                        updateConnectionState(
+                                failure == null ? ConnectionState.CONNECTED : ConnectionState.DISCONNECTED
+                        );
+                        if (failure == null) {
+                            reconnectGeneration.incrementAndGet();
+                        }
+                    });
             return connectionAttempt;
         }
     }
@@ -364,6 +396,9 @@ public final class AuthClientService implements AutoCloseable, ClientMessageList
                 case TURN_TIMEOUT -> sessionState.updateTurnTimeout(
                         payloadMapper.fromTree(message.data(), TurnTimeoutDto.class)
                 );
+                case GAME_OVER -> sessionState.updateGameOver(
+                        payloadMapper.fromTree(message.data(), GameOverDto.class)
+                );
                 default -> {
                     return;
                 }
@@ -396,6 +431,84 @@ public final class AuthClientService implements AutoCloseable, ClientMessageList
         updateConnectionState(ConnectionState.DISCONNECTED);
         IOException failure = new IOException("Connection to server was lost", cause);
         pendingRequests.values().forEach(pending -> pending.completeExceptionally(failure));
+        if (sessionState.isAuthenticated()) {
+            startAutomaticReconnect();
+        }
+    }
+
+    /**
+     * Gửi token session cũ trên connection mới và thay toàn bộ Room/Game State bằng
+     * snapshot authoritative. Deadline trong lượt được giữ nguyên vì lấy trực tiếp từ Server.
+     */
+    private CompletableFuture<Void> reconnectAuthenticatedSession() {
+        String sessionId = sessionState.requireSessionId();
+        return request(
+                MessageType.RECONNECT,
+                null,
+                new ReconnectRequest(sessionId),
+                MessageType.RECONNECT_RESULT,
+                ReconnectResult.class
+        ).thenAccept(result -> {
+            if (!result.restored()) {
+                throw new ClientProtocolException("Server did not restore the session");
+            }
+            sessionState.restoreAfterReconnect(result);
+            notifyStateListeners(MessageType.ROOM_UPDATED);
+            if (result.gameState() != null) {
+                notifyStateListeners(MessageType.GAME_STATE);
+            }
+        });
+    }
+
+    public CompletableFuture<RankingPayload> getRanking() {
+        return authenticatedRequest(
+                MessageType.GET_RANKING,
+                EmptyPayload.INSTANCE,
+                MessageType.RANKING_RESULT,
+                RankingPayload.class
+        );
+    }
+
+    public CompletableFuture<MatchHistoryPayload> getMatchHistory() {
+        return authenticatedRequest(
+                MessageType.GET_MATCH_HISTORY,
+                EmptyPayload.INSTANCE,
+                MessageType.MATCH_HISTORY_RESULT,
+                MatchHistoryPayload.class
+        );
+    }
+
+    /**
+     * Tự thử lại trong đúng cửa sổ grace period. Mỗi lần disconnect tạo một generation
+     * mới để callback cũ không thể khởi động thêm connection sau khi đã restore thành công.
+     */
+    private void startAutomaticReconnect() {
+        long generation = reconnectGeneration.incrementAndGet();
+        long deadlineNanos = System.nanoTime()
+                + TimeUnit.MILLISECONDS.toNanos(GameConstants.RECONNECT_GRACE_PERIOD_MILLIS);
+        scheduleReconnectAttempt(generation, deadlineNanos, 0L);
+    }
+
+    private void scheduleReconnectAttempt(long generation, long deadlineNanos, long delayMillis) {
+        reconnectScheduler.schedule(() -> {
+            if (closed.get()
+                    || generation != reconnectGeneration.get()
+                    || !sessionState.isAuthenticated()
+                    || System.nanoTime() >= deadlineNanos) {
+                return;
+            }
+            connectAsync().whenComplete((ignored, failure) -> {
+                if (failure != null
+                        && generation == reconnectGeneration.get()
+                        && System.nanoTime() < deadlineNanos) {
+                    scheduleReconnectAttempt(
+                            generation,
+                            deadlineNanos,
+                            RECONNECT_RETRY_DELAY.toMillis()
+                    );
+                }
+            });
+        }, delayMillis, TimeUnit.MILLISECONDS);
     }
 
     private <T> CompletableFuture<T> request(
@@ -496,7 +609,9 @@ public final class AuthClientService implements AutoCloseable, ClientMessageList
         pendingRequests.clear();
         connectionListeners.clear();
         stateListeners.clear();
+        reconnectGeneration.incrementAndGet();
         tcpClient.close();
+        reconnectScheduler.shutdownNow();
         requestExecutor.shutdownNow();
         connectionState = ConnectionState.DISCONNECTED;
     }

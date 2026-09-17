@@ -76,8 +76,9 @@ public final class SceneNavigator {
         FXMLLoader loader = loader("/fxml/game.fxml");
         Parent root = load(loader);
         GameController controller = loader.getController();
-        controller.configure(authService, sessionState);
+        controller.configure(authService, sessionState, this);
         show(root, controller, "Trận đấu");
+        ensureGameWindowSize();
     }
 
     public void onConnectionStateChanged(ConnectionState state) {
@@ -107,6 +108,17 @@ public final class SceneNavigator {
         stage.setMinHeight(540);
         stage.show();
         controller.onConnectionStateChanged(authService.connectionState());
+    }
+
+    /** Mở đủ không gian cho bàn cờ và sidebar nhưng vẫn cho phép ScrollPane co trên màn hình nhỏ. */
+    private void ensureGameWindowSize() {
+        stage.setMinWidth(960.0);
+        stage.setMinHeight(640.0);
+        if (!stage.isMaximized()) {
+            stage.setWidth(Math.max(stage.getWidth(), 1_080.0));
+            stage.setHeight(Math.max(stage.getHeight(), 720.0));
+            stage.centerOnScreen();
+        }
     }
 
     private static FXMLLoader loader(String resourcePath) {

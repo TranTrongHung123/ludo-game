@@ -12,9 +12,12 @@ import vn.ptit.ltm.server.network.ConnectionRegistry;
 import vn.ptit.ltm.server.network.TcpServer;
 import vn.ptit.ltm.server.lobby.LobbyService;
 import vn.ptit.ltm.server.repository.JdbcUserRepository;
+import vn.ptit.ltm.server.repository.JdbcMatchRepository;
 import vn.ptit.ltm.server.room.RoomService;
 import vn.ptit.ltm.server.service.AuthService;
 import vn.ptit.ltm.server.service.BCryptPasswordHasher;
+import vn.ptit.ltm.server.service.MatchService;
+import vn.ptit.ltm.server.service.RankingService;
 import vn.ptit.ltm.server.session.SessionConnectionListener;
 import vn.ptit.ltm.server.session.SessionManager;
 
@@ -57,7 +60,10 @@ public final class ServerApplication implements AutoCloseable {
         try {
             ConnectionRegistry connections = new ConnectionRegistry();
             LobbyService lobby = new LobbyService(sessions, connections);
-            rooms = new RoomService(sessions, connections);
+            JdbcMatchRepository matches = new JdbcMatchRepository(database.dataSource());
+            MatchService matchService = new MatchService(matches, sessions);
+            RankingService rankingService = new RankingService(matches);
+            rooms = new RoomService(sessions, connections, matchService);
             RoomService activeRooms = rooms;
             sessions.addEventListener(lobby::broadcastOnlinePlayers);
             sessions.addEventListener(activeRooms::onSessionsChanged);
@@ -77,7 +83,9 @@ public final class ServerApplication implements AutoCloseable {
                     ),
                     heartbeat,
                     lobby,
-                    activeRooms
+                    activeRooms,
+                    matchService,
+                    rankingService
             );
             TcpServer server = new TcpServer(
                     environmentInt("SERVER_PORT", DEFAULT_PORT, 1, 65_535),
