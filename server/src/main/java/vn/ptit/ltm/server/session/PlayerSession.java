@@ -3,12 +3,13 @@ package vn.ptit.ltm.server.session;
 import vn.ptit.ltm.common.enums.PlayerPresenceState;
 import vn.ptit.ltm.server.repository.UserAccountRecord;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Objects;
 
 public final class PlayerSession {
     private final String sessionId;
-    private final UserAccountRecord user;
+    private volatile UserAccountRecord user;
     private final Instant createdAt;
 
     private volatile String connectionId;
@@ -89,6 +90,24 @@ public final class PlayerSession {
         if (connected()) {
             presenceState = newPresenceState;
         }
+    }
+
+    void updateStatistics(BigDecimal totalScore, int firstPlaceCount) {
+        Objects.requireNonNull(totalScore, "totalScore");
+        if (totalScore.signum() < 0 || firstPlaceCount < 0) {
+            throw new IllegalArgumentException("Player statistics must not be negative");
+        }
+        UserAccountRecord current = user;
+        user = new UserAccountRecord(
+                current.id(),
+                current.username(),
+                current.passwordHash(),
+                current.displayName(),
+                totalScore,
+                firstPlaceCount,
+                current.createdAt(),
+                Instant.now()
+        );
     }
 
     void markOffline() {

@@ -193,6 +193,7 @@ $env:RUN_MYSQL_INTEGRATION_TESTS='true'
 ```
 
 Lần chạy đầu trên database rỗng sẽ tạo `users`, `matches`, `match_players` và `flyway_schema_history`.
+Migration mới nhất bổ sung `matches.public_id` duy nhất để việc lưu kết quả có thể retry mà không cộng điểm hai lần.
 
 ## Chạy Game Server
 
@@ -227,6 +228,13 @@ Server hiện hỗ trợ end-to-end:
 - bonus roll khi ra 6 hoặc gặp Lucky, turn rotation theo slot, hoàn thành quân/người chơi và xếp hạng trong RAM;
 - `TimeoutManager` authoritative cho phase Roll 8 giây và Move 12 giây, chống callback cũ đổi lượt hai lần bằng `stateVersion`;
 - broadcast `TURN_TIMEOUT` và Game State mới; người chơi `DISCONNECTED + ACTIVE` vẫn nhận lượt và timeout bình thường.
+- hết reconnect grace period 60 giây sẽ chuyển participant sang `FORFEITED`, gán hạng thấp nhất còn trống, đưa quân khỏi bàn và kiểm tra cascading Game Over;
+- broadcast `GAME_OVER` với bảng hạng authoritative khi forfeit làm trận kết thúc.
+- `LEAVE_ROOM` trong trận là Quit chủ động: forfeit ngay, 0 điểm, không có grace period, gỡ membership sống nhưng vẫn giữ participant trong kết quả;
+- cho phép người đã hoàn thành hoặc thành viên của phòng `FINISHED` rời phòng, chuyển host cho người còn lại và xóa phòng khi người cuối cùng rời.
+- lưu `matches`, `match_players`, cộng điểm và tăng số lần hạng nhất trong cùng một transaction khi trận kết thúc;
+- chống lưu/cộng điểm lặp bằng public match ID duy nhất; `GAME_OVER` dùng tổng điểm đã đọc lại từ database;
+- hỗ trợ `GET_RANKING` và `GET_MATCH_HISTORY` qua TCP; lịch sử trả tối đa 50 trận gần nhất của account đang đăng nhập.
 
 Không log plain-text password, password hash hay session token.
 
@@ -253,8 +261,15 @@ Client hiện hỗ trợ:
 - Ready/Unready, Start Game và chuyển sang màn hình trạng thái trận ban đầu;
 - nhận event `ROOM_UPDATED`, `INVITE_PLAYER`, `GAME_STATE` không có `requestId` và cập nhật state trước khi render;
 - đổ xúc xắc, chọn quân hợp lệ và gửi Move Piece từ màn hình trận;
+- render bàn cờ JavaFX gồm 48 ô vòng chung, 6 nấc Finish Track cho mỗi màu, khu vực chuồng và toàn bộ quân từ `GameState` authoritative;
+- render đúng danh sách Special Cells Server gửi, hiển thị trạng thái Slow/Shield và highlight quân thuộc `validPieceIds`; click quân chỉ chọn `pieceId`, không tự tính nước đi ở Client;
 - render dice, phase, countdown theo deadline Server, lượt hiện tại và vị trí `stepCount` mới nhất từ Game State;
 - nhận `TURN_TIMEOUT`, khóa thao tác khi deadline đã hết và hiển thị phản hồi timeout;
+- tự thử nối lại trong grace period, gửi `RECONNECT` bằng session cũ và chỉ mở lại thao tác sau khi đã nhận full Room/Game State cùng deadline authoritative;
+- nhận `GAME_OVER` và hiển thị bảng hạng, bao gồm người `FORFEITED` với 0 điểm;
+- nút `Bỏ cuộc` yêu cầu xác nhận rõ hậu quả trước khi gửi `LEAVE_ROOM`; sau `GAME_OVER` nút đổi thành `Về sảnh` và dọn Room/Game State cục bộ khi Server xác nhận;
+- có API bất đồng bộ cho Ranking và Match History để các màn hình tương ứng render dữ liệu authoritative từ Server;
+- tự làm mới điểm và số lần hạng nhất trong profile cục bộ từ snapshot Lobby do Server broadcast;
 - toàn bộ connect, send, receive và timeout chạy ngoài JavaFX Application Thread.
 
 ## Workflow phát triển

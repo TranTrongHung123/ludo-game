@@ -7,6 +7,7 @@ import vn.ptit.ltm.common.error.ErrorCode;
 import vn.ptit.ltm.server.repository.UserAccountRecord;
 import vn.ptit.ltm.server.service.AuthException;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -108,7 +109,10 @@ public final class SessionManager implements AutoCloseable {
             );
         }
         if (isGracePeriodExpired(session)) {
+            // Request reconnect đến đúng/sau deadline cũng phải phát event expiration;
+            // callback scheduler chạy sau đó sẽ không còn thấy session để phát lại.
             removeSession(session);
+            publishSessionsChanged();
             throw new AuthException(ErrorCode.SESSION_EXPIRED, "Reconnect grace period has expired");
         }
         ensureConnectionIsUnbound(newConnectionId);
@@ -164,6 +168,23 @@ public final class SessionManager implements AutoCloseable {
             return;
         }
         session.updatePresenceForSystem(presenceState);
+        publishSessionsChanged();
+    }
+
+    public synchronized void updateStatisticsForUser(
+            long userId,
+            BigDecimal totalScore,
+            int firstPlaceCount
+    ) {
+        String sessionId = sessionIdByUserId.get(userId);
+        if (sessionId == null) {
+            return;
+        }
+        PlayerSession session = sessionsById.get(sessionId);
+        if (session == null) {
+            return;
+        }
+        session.updateStatistics(totalScore, firstPlaceCount);
         publishSessionsChanged();
     }
 

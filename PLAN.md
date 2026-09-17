@@ -1,7 +1,6 @@
 # PLAN.md
 
-> Roadmap cho dự án **Ludo Game - BTL Lập trình mạng**.  
-
+> Roadmap cho dự án **Ludo Game - BTL Lập trình mạng**.
 
 ## Quy ước trạng thái
 
@@ -187,25 +186,25 @@
 - [x] Bonus phase timeout reset
 - [x] Ngăn double-next-turn
 - [x] Disconnect trong lượt
-- [ ] Reconnect trong lượt
-- [ ] Grace-period expiration
-- [ ] Forfeit processing
+- [x] Reconnect trong lượt
+- [x] Grace-period expiration
+- [x] Forfeit processing
 
 ---
 
 # Phase 12 - Ranking & Match Persistence
 
-- [ ] Lưu match result
-- [ ] Lưu match players
-- [ ] Cập nhật score
-- [ ] Cập nhật số lần hạng nhất
-- [ ] Ranking end-to-end
-- [ ] Match History end-to-end
-- [ ] Forfeit scoring
-- [ ] Cascading Game Over
-- [ ] Kiểm thử score theo phòng 2 người
-- [ ] Kiểm thử score theo phòng 3 người
-- [ ] Kiểm thử score theo phòng 4 người
+- [x] Lưu match result
+- [x] Lưu match players
+- [x] Cập nhật score
+- [x] Cập nhật số lần hạng nhất
+- [x] Ranking end-to-end
+- [x] Match History end-to-end
+- [x] Forfeit scoring
+- [x] Cascading Game Over
+- [x] Kiểm thử score theo phòng 2 người
+- [x] Kiểm thử score theo phòng 3 người
+- [x] Kiểm thử score theo phòng 4 người
 
 ---
 
@@ -218,18 +217,18 @@
 - [x] Register Screen
 - [x] Lobby Screen
 - [x] Room Screen
-- [ ] Game Board Screen
+- [x] Game Board Screen
 - [ ] Ranking Screen
 - [ ] Match History Screen
 - [ ] Game Result Screen
-- [ ] Render 48 ring cells
-- [ ] Render Finish Track
-- [ ] Render Pieces
-- [ ] Highlight valid moves
+- [x] Render 48 ring cells
+- [x] Render Finish Track
+- [x] Render Pieces
+- [x] Highlight valid moves
 - [x] Render Dice
 - [x] Render Turn Indicator
 - [x] Render Countdown
-- [ ] Render Special Cells
+- [x] Render Special Cells
 - [x] Network thread không block JavaFX Application Thread
 
 ---
@@ -257,12 +256,12 @@
 - [ ] Full match 3 players
 - [ ] Full match 4 players
 - [ ] Concurrent room join
-- [ ] Host leave
-- [ ] Player quit
+- [x] Host leave
+- [x] Player quit
 - [ ] Disconnect
-- [ ] Reconnect
+- [x] Reconnect
 - [ ] Timeout
-- [ ] Grace-period forfeit
+- [x] Grace-period forfeit
 - [ ] Invalid frame
 - [ ] Oversized frame
 - [ ] Malformed JSON
@@ -297,54 +296,6 @@
 
 ---
 
-# Jira / GitHub Mapping
-
-`PLAN.md` chỉ theo dõi task lớn.
-
-Mỗi task lớn nên có một Jira issue / story tương ứng hoặc được chia thành nhiều Jira issue độc lập.
-
-Ví dụ:
-
-```text
-PLAN.md
-[ ] Login end-to-end
-
-        ↓
-
-Jira
-KAN-11 Login end-to-end
-
-        ↓
-
-GitHub Branch
-feat/KAN-11-login
-
-        ↓
-
-Pull Request
-KAN-11 Login end-to-end
-```
-
-Quy ước branch:
-
-```text
-feat/KAN-xx-feature-name
-fix/KAN-xx-bug-name
-test/KAN-xx-test-name
-docs/KAN-xx-doc-name
-```
-
-Quy ước commit:
-
-```text
-feat(KAN-xx): ...
-fix(KAN-xx): ...
-test(KAN-xx): ...
-docs(KAN-xx): ...
-```
-
----
-
 # Definition of Done
 
 Một task lớn được đánh `[x]` khi phạm vi triển khai local đáp ứng:
@@ -355,14 +306,12 @@ Một task lớn được đánh `[x]` khi phạm vi triển khai local đáp �
 - Maven build không bị phá.
 - Không mâu thuẫn `AGENTS.md`.
 
-Jira issue và Pull Request vẫn được khuyến nghị để truy vết công việc, nhưng không còn là điều kiện chặn cập nhật checklist này.
-
 ---
 
 # Current Focus
 
 Hiện tại ưu tiên:
 
-1. Hoàn thiện reconnect trong lượt trên JavaFX Client.
-2. Xử lý grace-period expiration và forfeit trong trận.
-3. Xây dựng bàn cờ JavaFX, render quân và Special Cells theo Game State.
+1. Xây dựng Ranking, Match History và Game Result Screen.
+2. Bổ sung full-match integration test cho phòng 2, 3 và 4 người.
+3. Bổ sung các network/integration test còn thiếu trong Phase 15.

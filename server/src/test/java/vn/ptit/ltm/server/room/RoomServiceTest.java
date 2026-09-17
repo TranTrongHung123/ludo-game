@@ -406,11 +406,78 @@ class RoomServiceTest {
             assertEquals(PlayerPresenceState.PLAYING, second.presenceState());
             assertTrue(rooms.gameForPlayer(second.user().id()).isPresent());
 
-            RoomException cannotLeave = assertThrows(
-                    RoomException.class,
-                    () -> rooms.leaveRoom(host.sessionId(), host.connectionId(), room.roomId())
-            );
-            assertEquals(ErrorCode.GAME_ALREADY_STARTED, cannotLeave.errorCode());
+        }
+    }
+
+    @Test
+    void quitDuringPlayingForfeitsImmediatelyAndReleasesMembership() {
+        try (SessionManager sessions = new SessionManager(Duration.ofSeconds(2))) {
+            PlayerSession host = session(sessions, 1);
+            PlayerSession quitter = session(sessions, 2);
+            PlayerSession third = session(sessions, 3);
+            try (RoomService rooms = new RoomService(
+                    sessions,
+                    new ConnectionRegistry(),
+                    () -> 3
+            )) {
+                String roomId = startThreePlayerGame(rooms, host, quitter, third);
+
+                rooms.leaveRoom(quitter.sessionId(), quitter.connectionId(), roomId);
+
+                assertEquals(PlayerPresenceState.IDLE, quitter.presenceState());
+                assertTrue(rooms.roomForPlayer(quitter.user().id()).isEmpty());
+                var continued = rooms.gameForPlayer(host.user().id()).orElseThrow();
+                var forfeited = continued.participants().stream()
+                        .filter(participant -> participant.playerId().equals("2"))
+                        .findFirst()
+                        .orElseThrow();
+                assertEquals(vn.ptit.ltm.common.enums.RoomState.PLAYING, continued.roomState());
+                assertEquals("1", continued.currentPlayerId());
+                assertEquals(MatchParticipantStatus.FORFEITED, forfeited.matchStatus());
+                assertEquals(3, forfeited.rank());
+                assertEquals(BigDecimal.ZERO, forfeited.scoreEarned());
+                assertTrue(forfeited.pieces().stream().allMatch(piece -> piece.stepCount() == -1));
+                assertEquals(2, rooms.roomForPlayer(host.user().id()).orElseThrow().players().size());
+
+                // Mapping phòng cũ đã được giải phóng nên người Quit có thể tạo phòng mới ngay.
+                assertEquals(
+                        quitter.user().id(),
+                        Long.parseLong(rooms.createRoom(quitter.sessionId(), quitter.connectionId()).hostPlayerId())
+                );
+            }
+        }
+    }
+
+    @Test
+    void hostQuitFinishesTwoPlayerGameAndWinnerCanLeaveFinishedRoom() {
+        try (SessionManager sessions = new SessionManager(Duration.ofSeconds(2))) {
+            PlayerSession host = session(sessions, 1);
+            PlayerSession second = session(sessions, 2);
+            try (RoomService rooms = new RoomService(
+                    sessions,
+                    new ConnectionRegistry(),
+                    () -> 3
+            )) {
+                String roomId = startTwoPlayerGame(rooms, host, second);
+
+                rooms.leaveRoom(host.sessionId(), host.connectionId(), roomId);
+
+                assertEquals(PlayerPresenceState.IDLE, host.presenceState());
+                assertTrue(rooms.roomForPlayer(host.user().id()).isEmpty());
+                var remainingRoom = rooms.roomForPlayer(second.user().id()).orElseThrow();
+                assertEquals(vn.ptit.ltm.common.enums.RoomState.FINISHED, remainingRoom.state());
+                assertEquals("2", remainingRoom.hostPlayerId());
+                assertEquals(1, remainingRoom.players().size());
+                var finished = rooms.gameForPlayer(second.user().id()).orElseThrow();
+                assertEquals(MatchParticipantStatus.FORFEITED, finished.participants().getFirst().matchStatus());
+                assertEquals(MatchParticipantStatus.COMPLETED, finished.participants().get(1).matchStatus());
+
+                rooms.leaveRoom(second.sessionId(), second.connectionId(), roomId);
+
+                assertEquals(PlayerPresenceState.IDLE, second.presenceState());
+                assertTrue(rooms.roomForPlayer(second.user().id()).isEmpty());
+                assertTrue(rooms.gameForPlayer(second.user().id()).isEmpty());
+            }
         }
     }
 
@@ -449,6 +516,133 @@ class RoomServiceTest {
                 assertEquals("2", afterDuplicateCallback.currentPlayerId());
                 assertEquals(1L, afterDuplicateCallback.stateVersion());
                 assertEquals(roomId, afterDuplicateCallback.roomId());
+            }
+        }
+    }
+
+    @Test
+    void reconnectDuringMovePhaseRestoresSameAuthoritativeDeadlineAndCanContinueTurn() {
+        try (SessionManager sessions = new SessionManager(Duration.ofSeconds(2))) {
+            PlayerSession host = session(sessions, 1);
+            PlayerSession second = session(sessions, 2);
+            MutableClock clock = new MutableClock(Instant.parse("2026-01-01T00:00:00Z"));
+            try (RoomService rooms = new RoomService(
+                    sessions,
+                    new ConnectionRegistry(),
+                    clock,
+                    Duration.ofSeconds(60),
+                    () -> 6
+            )) {
+                String roomId = startTwoPlayerGame(rooms, host, second);
+                rooms.rollDice(host.sessionId(), host.connectionId(), roomId);
+                var beforeDisconnect = rooms.gameForPlayer(host.user().id()).orElseThrow();
+
+                sessions.disconnect(host.connectionId());
+                rooms.onSessionsChanged();
+                assertEquals(
+                        PlayerPresenceState.DISCONNECTED,
+                        rooms.gameForPlayer(host.user().id()).orElseThrow().participants().getFirst().presenceState()
+                );
+
+                PlayerSession restored = sessions.reconnect(host.sessionId(), "connection-restored");
+                rooms.onSessionsChanged();
+                var afterReconnect = rooms.gameForPlayer(host.user().id()).orElseThrow();
+                assertEquals(PlayerPresenceState.PLAYING, restored.presenceState());
+                assertEquals(TurnState.WAITING_FOR_MOVE, afterReconnect.turnState());
+                assertEquals(beforeDisconnect.stateVersion(), afterReconnect.stateVersion());
+                assertEquals(
+                        beforeDisconnect.serverDeadlineEpochMillis(),
+                        afterReconnect.serverDeadlineEpochMillis()
+                );
+                assertEquals(beforeDisconnect.validPieceIds(), afterReconnect.validPieceIds());
+
+                var moved = rooms.movePiece(
+                        host.sessionId(),
+                        restored.connectionId(),
+                        roomId,
+                        afterReconnect.validPieceIds().getFirst()
+                );
+                assertEquals(0, moved.piece().stepCount());
+            }
+        }
+    }
+
+    @Test
+    void gracePeriodExpirationForfeitsPlayerAndFinishesTwoPlayerGame() throws Exception {
+        try (SessionManager sessions = new SessionManager(Duration.ofMillis(80))) {
+            PlayerSession host = session(sessions, 1);
+            PlayerSession second = session(sessions, 2);
+            try (RoomService rooms = new RoomService(
+                    sessions,
+                    new ConnectionRegistry(),
+                    () -> 3
+            )) {
+                sessions.addEventListener(rooms::onSessionsChanged);
+                String roomId = startTwoPlayerGame(rooms, host, second);
+
+                sessions.disconnect(second.connectionId());
+                assertEquals(
+                        MatchParticipantStatus.ACTIVE,
+                        rooms.gameForPlayer(host.user().id()).orElseThrow().participants().get(1).matchStatus()
+                );
+
+                await(() -> rooms.gameForPlayer(host.user().id())
+                        .map(game -> game.roomState() == vn.ptit.ltm.common.enums.RoomState.FINISHED)
+                        .orElse(false));
+                var finished = rooms.gameForPlayer(host.user().id()).orElseThrow();
+                var winner = finished.participants().stream()
+                        .filter(participant -> participant.playerId().equals("1"))
+                        .findFirst()
+                        .orElseThrow();
+                var loser = finished.participants().stream()
+                        .filter(participant -> participant.playerId().equals("2"))
+                        .findFirst()
+                        .orElseThrow();
+                assertEquals(roomId, finished.roomId());
+                assertEquals(MatchParticipantStatus.COMPLETED, winner.matchStatus());
+                assertEquals(1, winner.rank());
+                assertEquals(MatchParticipantStatus.FORFEITED, loser.matchStatus());
+                assertEquals(2, loser.rank());
+                assertEquals(BigDecimal.ZERO, loser.scoreEarned());
+                assertTrue(loser.pieces().stream().allMatch(piece -> piece.stepCount() == -1));
+                assertTrue(sessions.findByUserId(second.user().id()).isEmpty());
+            }
+        }
+    }
+
+    @Test
+    void coalescedSessionExpirationsForfeitAllExpiredBeforeEvaluatingCascading() {
+        try (SessionManager sessions = new SessionManager(Duration.ofSeconds(2))) {
+            PlayerSession host = session(sessions, 1);
+            PlayerSession second = session(sessions, 2);
+            PlayerSession third = session(sessions, 3);
+            try (RoomService rooms = new RoomService(
+                    sessions,
+                    new ConnectionRegistry(),
+                    () -> 3
+            )) {
+                startThreePlayerGame(rooms, host, second, third);
+
+                // Mô phỏng event executor quan sát một snapshot đã thiếu đồng thời hai session hết hạn.
+                sessions.logout(host.sessionId(), host.connectionId());
+                sessions.logout(second.sessionId(), second.connectionId());
+                rooms.onSessionsChanged();
+
+                var finished = rooms.gameForPlayer(third.user().id()).orElseThrow();
+                assertEquals(vn.ptit.ltm.common.enums.RoomState.FINISHED, finished.roomState());
+                assertTrue(finished.participants().stream()
+                        .filter(participant -> participant.playerId().equals("1")
+                                || participant.playerId().equals("2"))
+                        .allMatch(participant -> participant.matchStatus() == MatchParticipantStatus.FORFEITED
+                                && BigDecimal.ZERO.compareTo(participant.scoreEarned()) == 0));
+                assertEquals(
+                        MatchParticipantStatus.COMPLETED,
+                        finished.participants().stream()
+                                .filter(participant -> participant.playerId().equals("3"))
+                                .findFirst()
+                                .orElseThrow()
+                                .matchStatus()
+                );
             }
         }
     }
@@ -531,6 +725,22 @@ class RoomServiceTest {
         rooms.joinRoom(second.sessionId(), second.connectionId(), room.roomId());
         rooms.setReady(host.sessionId(), host.connectionId(), room.roomId(), true);
         rooms.setReady(second.sessionId(), second.connectionId(), room.roomId(), true);
+        rooms.startGame(host.sessionId(), host.connectionId(), room.roomId());
+        return room.roomId();
+    }
+
+    private static String startThreePlayerGame(
+            RoomService rooms,
+            PlayerSession host,
+            PlayerSession second,
+            PlayerSession third
+    ) {
+        var room = rooms.createRoom(host.sessionId(), host.connectionId());
+        rooms.joinRoom(second.sessionId(), second.connectionId(), room.roomId());
+        rooms.joinRoom(third.sessionId(), third.connectionId(), room.roomId());
+        rooms.setReady(host.sessionId(), host.connectionId(), room.roomId(), true);
+        rooms.setReady(second.sessionId(), second.connectionId(), room.roomId(), true);
+        rooms.setReady(third.sessionId(), third.connectionId(), room.roomId(), true);
         rooms.startGame(host.sessionId(), host.connectionId(), room.roomId());
         return room.roomId();
     }

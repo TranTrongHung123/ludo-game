@@ -101,6 +101,17 @@
     -fx-text-fill: #5138bd;
 }
 
+.danger-button {
+    -fx-background-color: #fff0f1;
+    -fx-border-color: #efb4bb;
+    -fx-border-radius: 9px;
+    -fx-text-fill: #b92f42;
+}
+
+.danger-button:hover {
+    -fx-background-color: #ffe1e5;
+}
+
 .hyperlink {
     -fx-text-fill: #6045d2;
     -fx-font-weight: 700;
@@ -179,3 +190,176 @@
     -fx-font-weight: 700;
     -fx-text-fill: #7c3aed;
 }
+
+.game-scroll,
+.game-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.game-content {
+    -fx-padding: 16px 24px 20px 24px;
+}
+
+.board-card,
+.game-sidebar {
+    -fx-background-color: white;
+    -fx-background-radius: 16px;
+    -fx-padding: 18px;
+    -fx-effect: dropshadow(gaussian, rgba(38, 45, 73, 0.10), 20, 0.10, 0, 7);
+}
+
+.ludo-board {
+    -fx-background-color: radial-gradient(center 50% 50%, radius 70%, #ffffff, #f2f4fa);
+    -fx-background-radius: 250px;
+    -fx-border-color: #d7ddea;
+    -fx-border-radius: 250px;
+    -fx-border-width: 2px;
+}
+
+.track-cell,
+.finish-cell {
+    -fx-background-color: white;
+    -fx-background-radius: 15px;
+    -fx-border-color: #bbc4d5;
+    -fx-border-radius: 15px;
+    -fx-border-width: 1px;
+    -fx-effect: dropshadow(gaussian, rgba(30, 40, 70, 0.10), 3, 0.1, 0, 1);
+}
+
+.track-cell-label {
+    -fx-font-size: 9px;
+    -fx-font-weight: 800;
+    -fx-text-fill: #4b556b;
+}
+
+.finish-cell.red,
+.spawn-red {
+    -fx-background-color: #ffd9dd;
+    -fx-border-color: #dc4456;
+}
+
+.finish-cell.blue,
+.spawn-blue {
+    -fx-background-color: #d9eaff;
+    -fx-border-color: #367bd6;
+}
+
+.finish-cell.yellow,
+.spawn-yellow {
+    -fx-background-color: #fff1b8;
+    -fx-border-color: #d8a915;
+}
+
+.finish-cell.green,
+.spawn-green {
+    -fx-background-color: #d8f4e3;
+    -fx-border-color: #339b62;
+}
+
+.piece-yard {
+    -fx-background-radius: 24px;
+    -fx-border-radius: 24px;
+    -fx-border-width: 2px;
+    -fx-opacity: 0.72;
+}
+
+.yard-red {
+    -fx-background-color: #fff0f1;
+    -fx-border-color: #dc4456;
+}
+
+.yard-blue {
+    -fx-background-color: #eef6ff;
+    -fx-border-color: #367bd6;
+}
+
+.yard-yellow {
+    -fx-background-color: #fff9df;
+    -fx-border-color: #d8a915;
+}
+
+.yard-green {
+    -fx-background-color: #eefaf2;
+    -fx-border-color: #339b62;
+}
+
+.yard-label {
+    -fx-font-size: 10px;
+    -fx-font-weight: 900;
+    -fx-opacity: 0.55;
+}
+
+.text-red { -fx-text-fill: #b92f42; }
+.text-blue { -fx-text-fill: #286bbf; }
+.text-yellow { -fx-text-fill: #a37c08; }
+.text-green { -fx-text-fill: #237c4b; }
+
+.board-home {
+    -fx-fill: #f0edff;
+    -fx-stroke: #6045d2;
+    -fx-stroke-width: 3px;
+}
+
+.board-piece {
+    -fx-background-radius: 13px;
+    -fx-border-color: white;
+    -fx-border-radius: 13px;
+    -fx-border-width: 2px;
+    -fx-effect: dropshadow(gaussian, rgba(20, 29, 48, 0.38), 5, 0.2, 0, 2);
+}
+
+.piece-number {
+    -fx-font-size: 11px;
+    -fx-font-weight: 900;
+    -fx-text-fill: white;
+}
+
+.piece-red { -fx-background-color: #d9364b; }
+.piece-blue { -fx-background-color: #2e75cf; }
+.piece-yellow { -fx-background-color: #d8a915; }
+.piece-green { -fx-background-color: #2b955a; }
+
+.piece-valid {
+    -fx-border-color: #ffffff, #7c3aed;
+    -fx-border-insets: 0, -4px;
+    -fx-border-radius: 13px, 17px;
+    -fx-border-width: 2px, 3px;
+    -fx-effect: dropshadow(gaussian, rgba(124, 58, 237, 0.75), 11, 0.35, 0, 0);
+}
+
+.piece-selected {
+    -fx-scale-x: 1.18;
+    -fx-scale-y: 1.18;
+}
+
+.piece-slowed {
+    -fx-opacity: 0.62;
+}
+
+.piece-shielded {
+    -fx-border-color: #ffffff, #46d3ff;
+    -fx-border-insets: 0, -3px;
+    -fx-border-radius: 13px, 16px;
+    -fx-border-width: 2px, 2px;
+}
+
+.special-speed { -fx-background-color: #dff8ed; -fx-border-color: #25a66a; }
+.special-slow { -fx-background-color: #e8efff; -fx-border-color: #5b78d1; }
+.special-lucky { -fx-background-color: #fff5bd; -fx-border-color: #d9a913; }
+.special-trap { -fx-background-color: #ffe3e3; -fx-border-color: #cc4c4c; }
+.special-shield { -fx-background-color: #e9e3ff; -fx-border-color: #7657d9; }
+
+.board-legend {
+    -fx-padding: 4px 0 0 0;
+}
+
+.board-legend .label {
+    -fx-font-size: 10px;
+    -fx-font-weight: 800;
+}
+
+.legend-speed { -fx-text-fill: #208253; }
+.legend-slow { -fx-text-fill: #4865b8; }
+.legend-lucky { -fx-text-fill: #a47a05; }
+.legend-trap { -fx-text-fill: #b33d3d; }
+.legend-shield { -fx-text-fill: #6545c5; }

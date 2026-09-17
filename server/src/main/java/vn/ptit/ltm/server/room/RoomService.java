@@ -22,6 +22,7 @@ import vn.ptit.ltm.server.game.DiceRoller;
 import vn.ptit.ltm.server.session.PlayerSession;
 import vn.ptit.ltm.server.session.SessionManager;
 import vn.ptit.ltm.server.session.SessionSnapshot;
+import vn.ptit.ltm.server.service.MatchService;
 
 import java.io.IOException;
 import java.time.Clock;
@@ -29,11 +30,13 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class RoomService implements AutoCloseable {
     private static final Logger LOGGER = LoggerFactory.getLogger(RoomService.class);
@@ -46,9 +49,11 @@ public final class RoomService implements AutoCloseable {
     private final Duration invitationTtl;
     private final DiceRoller diceRoller;
     private final TimeoutManager timeoutManager;
+    private final MatchService matchService;
     private final Object invitationLock = new Object();
     private final Map<String, PendingInvitation> invitationsById = new HashMap<>();
     private final Map<Long, String> invitationIdByTargetUserId = new HashMap<>();
+    private final AtomicBoolean closed = new AtomicBoolean();
     private volatile Map<Long, PlayerPresenceState> previousPresence;
 
     public RoomService(SessionManager sessionManager, ConnectionRegistry connectionRegistry) {
@@ -57,7 +62,23 @@ public final class RoomService implements AutoCloseable {
                 connectionRegistry,
                 Clock.systemUTC(),
                 Duration.ofMillis(GameConstants.INVITATION_TTL_MILLIS),
-                DiceRoller.random()
+                DiceRoller.random(),
+                null
+        );
+    }
+
+    public RoomService(
+            SessionManager sessionManager,
+            ConnectionRegistry connectionRegistry,
+            MatchService matchService
+    ) {
+        this(
+                sessionManager,
+                connectionRegistry,
+                Clock.systemUTC(),
+                Duration.ofMillis(GameConstants.INVITATION_TTL_MILLIS),
+                DiceRoller.random(),
+                Objects.requireNonNull(matchService, "matchService")
         );
     }
 
@@ -71,7 +92,8 @@ public final class RoomService implements AutoCloseable {
                 connectionRegistry,
                 Clock.systemUTC(),
                 Duration.ofMillis(GameConstants.INVITATION_TTL_MILLIS),
-                diceRoller
+                diceRoller,
+                null
         );
     }
 
@@ -81,7 +103,7 @@ public final class RoomService implements AutoCloseable {
             Clock clock,
             Duration invitationTtl
     ) {
-        this(sessionManager, connectionRegistry, clock, invitationTtl, DiceRoller.random());
+        this(sessionManager, connectionRegistry, clock, invitationTtl, DiceRoller.random(), null);
     }
 
     RoomService(
@@ -91,11 +113,23 @@ public final class RoomService implements AutoCloseable {
             Duration invitationTtl,
             DiceRoller diceRoller
     ) {
+        this(sessionManager, connectionRegistry, clock, invitationTtl, diceRoller, null);
+    }
+
+    RoomService(
+            SessionManager sessionManager,
+            ConnectionRegistry connectionRegistry,
+            Clock clock,
+            Duration invitationTtl,
+            DiceRoller diceRoller,
+            MatchService matchService
+    ) {
         this.sessionManager = Objects.requireNonNull(sessionManager, "sessionManager");
         this.connectionRegistry = Objects.requireNonNull(connectionRegistry, "connectionRegistry");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.invitationTtl = Objects.requireNonNull(invitationTtl, "invitationTtl");
         this.diceRoller = Objects.requireNonNull(diceRoller, "diceRoller");
+        this.matchService = matchService;
         if (invitationTtl.isZero() || invitationTtl.isNegative()) {
             throw new IllegalArgumentException("invitationTtl must be positive");
         }
@@ -142,15 +176,29 @@ public final class RoomService implements AutoCloseable {
     public void leaveRoom(String sessionId, String connectionId, String roomId) {
         PlayerSession session = sessionManager.requireAuthenticated(sessionId, connectionId);
         requireRoomId(roomId);
-        roomManager.requireRoomForPlayer(roomId, session.user().id());
-        GameRoom room = roomManager.leaveCurrent(session.user().id())
+        long userId = session.user().id();
+        GameRoom room = roomManager.requireRoomForPlayer(roomId, userId);
+        Optional<GameStateDto> forfeited = room.forfeitActivePlayer(
+                userId,
+                clock.instant(),
+                presenceSnapshot()
+        );
+        GameRoom changedRoom = roomManager.leaveCurrent(userId)
+                .or(() -> roomManager.departCurrent(userId))
                 .orElseThrow(() -> new RoomException(
-                        ErrorCode.GAME_ALREADY_STARTED,
-                        "A started game must be left through the forfeit flow"
+                        ErrorCode.NOT_IN_ROOM,
+                        "Player cannot leave this room"
                 ));
         sessionManager.updatePresence(sessionId, PlayerPresenceState.IDLE);
         invalidateInvitationsForRoom(roomId);
-        LOGGER.info("Player {} left room {}", session.user().id(), roomId);
+        if (forfeited.isPresent()) {
+            // Quit chủ động trong trận bỏ qua grace period và dùng chung luật forfeit authoritative.
+            persistCompletedMatch(changedRoom);
+            scheduleTurnTimeout(changedRoom);
+            LOGGER.info("Player {} quit and forfeited room {}", userId, roomId);
+        } else {
+            LOGGER.info("Player {} left room {}", userId, roomId);
+        }
     }
 
     public InvitationDto invitePlayer(
@@ -307,6 +355,7 @@ public final class RoomService implements AutoCloseable {
                 now,
                 presenceSnapshot()
         );
+        persistCompletedMatch(room);
         scheduleTurnTimeout(room);
         LOGGER.info(
                 "Player {} moved piece {} in room {}; captured={}, bonus={}",
@@ -320,12 +369,30 @@ public final class RoomService implements AutoCloseable {
     }
 
     public void leaveForSessionEnd(long userId) {
-        roomManager.leaveCurrent(userId).ifPresent(room -> {
-            LOGGER.info("Removed player {} from room {} after session ended", userId, room.roomId());
-            invalidateInvitationsForRoom(room.roomId());
-            if (!room.isClosed()) {
-                broadcast(room);
+        roomManager.findByPlayer(userId).ifPresent(room -> {
+            Map<Long, PlayerPresenceState> presence = presenceSnapshot();
+            Optional<GameStateDto> forfeited = room.forfeitActivePlayer(userId, clock.instant(), presence);
+            Optional<GameRoom> departed = roomManager.leaveCurrent(userId)
+                    .or(() -> roomManager.departCurrent(userId));
+            if (forfeited.isPresent()) {
+                // Logout/quit trong trận không có grace period: xử lý forfeit ngay lập tức.
+                persistCompletedMatch(room);
+                scheduleTurnTimeout(room);
+                LOGGER.info("Player {} forfeited room {} after session ended", userId, room.roomId());
             }
+            departed.ifPresent(changedRoom -> {
+                LOGGER.info(
+                        "Removed player {} from room {} after session ended",
+                        userId,
+                        changedRoom.roomId()
+                );
+                invalidateInvitationsForRoom(changedRoom.roomId());
+                if (!changedRoom.isClosed()) {
+                    broadcast(changedRoom);
+                    // Participant COMPLETED cũng có thể logout/rời sớm; luôn đồng bộ lại presence.
+                    broadcastGameUpdated(changedRoom.roomId());
+                }
+            });
         });
     }
 
@@ -352,7 +419,12 @@ public final class RoomService implements AutoCloseable {
     public void broadcastGameUpdated(String roomId) {
         roomManager.findById(roomId).ifPresent(room -> room
                 .gameSnapshotIfStarted(presenceSnapshot())
-                .ifPresent(gameState -> broadcast(room, MessageType.GAME_STATE_UPDATED, gameState))
+                .ifPresent(gameState -> {
+                    broadcast(room, MessageType.GAME_STATE_UPDATED, gameState);
+                    room.gameOverSnapshot().ifPresent(gameOver ->
+                            broadcast(room, MessageType.GAME_OVER, gameOver)
+                    );
+                })
         );
     }
 
@@ -367,25 +439,58 @@ public final class RoomService implements AutoCloseable {
         }
     }
 
+    /**
+     * Đồng bộ thay đổi session vào phòng. DISCONNECTED vẫn còn trong snapshot nên chỉ
+     * cập nhật presence; chỉ khi session biến mất sau grace period mới xử lý remove ở
+     * phòng chờ hoặc FORFEITED trong trận đang chạy.
+     */
     public synchronized void onSessionsChanged() {
+        if (closed.get()) {
+            return;
+        }
         Map<Long, PlayerPresenceState> currentPresence = presenceSnapshot();
         Set<String> affectedRoomIds = new HashSet<>();
+        Set<String> forfeitedRoomIds = new HashSet<>();
 
         for (GameRoom room : roomManager.snapshot()) {
-            for (Long memberUserId : room.memberUserIds()) {
-                if (!currentPresence.containsKey(memberUserId)) {
-                    roomManager.leaveCurrent(memberUserId)
-                            .filter(changedRoom -> !changedRoom.isClosed())
-                            .ifPresent(changedRoom -> {
-                                affectedRoomIds.add(changedRoom.roomId());
-                                invalidateInvitationsForRoom(changedRoom.roomId());
-                                LOGGER.info(
-                                        "Removed player {} from room {} after reconnect grace period",
-                                        memberUserId,
-                                        room.roomId()
-                                );
-                            });
-                }
+            List<Long> expiredUserIds = room.memberUserIds().stream()
+                    .filter(memberUserId -> !currentPresence.containsKey(memberUserId))
+                    .toList();
+            if (expiredUserIds.isEmpty()) {
+                continue;
+            }
+
+            Optional<GameStateDto> forfeited = room.forfeitActivePlayers(
+                    expiredUserIds,
+                    clock.instant(),
+                    currentPresence
+            );
+            if (forfeited.isPresent()) {
+                expiredUserIds.forEach(roomManager::departCurrent);
+                persistCompletedMatch(room);
+                affectedRoomIds.add(room.roomId());
+                forfeitedRoomIds.add(room.roomId());
+                scheduleTurnTimeout(room);
+                expiredUserIds.forEach(memberUserId ->
+                        LOGGER.info(
+                                "Player {} forfeited room {} after reconnect grace period",
+                                memberUserId,
+                                room.roomId()
+                        )
+                );
+            } else {
+                expiredUserIds.forEach(memberUserId -> roomManager.leaveCurrent(memberUserId)
+                        .or(() -> roomManager.departCurrent(memberUserId))
+                        .filter(changedRoom -> !changedRoom.isClosed())
+                        .ifPresent(changedRoom -> {
+                            affectedRoomIds.add(changedRoom.roomId());
+                            invalidateInvitationsForRoom(changedRoom.roomId());
+                            LOGGER.info(
+                                    "Removed player {} from room {} after reconnect grace period",
+                                    memberUserId,
+                                    room.roomId()
+                            );
+                        }));
             }
         }
         Set<Long> candidates = new HashSet<>(currentPresence.keySet());
@@ -399,7 +504,11 @@ public final class RoomService implements AutoCloseable {
         previousPresence = currentPresence;
         affectedRoomIds.forEach(roomId -> {
             broadcastRoom(roomId);
-            broadcastGame(roomId);
+            if (forfeitedRoomIds.contains(roomId)) {
+                broadcastGameUpdated(roomId);
+            } else {
+                broadcastGame(roomId);
+            }
         });
     }
 
@@ -459,6 +568,22 @@ public final class RoomService implements AutoCloseable {
             presence.put(snapshot.userId(), snapshot.presenceState());
         }
         return Map.copyOf(presence);
+    }
+
+    private void persistCompletedMatch(GameRoom room) {
+        if (matchService == null) {
+            return;
+        }
+        synchronized (room) {
+            if (room.matchPersisted()) {
+                return;
+            }
+            room.completedMatchSnapshot().ifPresent(match -> {
+                var gameOver = matchService.completeMatch(room.roomId(), match);
+                room.markMatchPersisted(gameOver);
+                LOGGER.info("Persisted completed match {} for room {}", match.matchId(), room.roomId());
+            });
+        }
     }
 
     private void broadcast(GameRoom room) {
@@ -567,7 +692,9 @@ public final class RoomService implements AutoCloseable {
 
     @Override
     public void close() {
-        timeoutManager.close();
+        if (closed.compareAndSet(false, true)) {
+            timeoutManager.close();
+        }
     }
 
     private record PendingInvitation(
