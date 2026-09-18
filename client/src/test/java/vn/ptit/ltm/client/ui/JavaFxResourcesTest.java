@@ -18,10 +18,24 @@ class JavaFxResourcesTest {
         assertWellFormed("/fxml/lobby.fxml");
         assertWellFormed("/fxml/room.fxml");
         assertWellFormed("/fxml/game.fxml");
+        assertWellFormed("/fxml/ranking.fxml");
+        assertWellFormed("/fxml/match-history.fxml");
+        assertWellFormed("/fxml/game-result.fxml");
 
         try (InputStream stylesheet = resource("/css/application.css")) {
             assertTrue(stylesheet.readAllBytes().length > 0);
         }
+        try (InputStream loginBackground = resource("/images/login.png")) {
+            assertTrue(loginBackground.readAllBytes().length > 0);
+        }
+    }
+
+    @Test
+    void rankingHistoryAndResultResourcesExposeTheirPrimaryActions() throws Exception {
+        assertResourceContains("/fxml/lobby.fxml", "#handleShowRanking", "#handleShowMatchHistory");
+        assertResourceContains("/fxml/ranking.fxml", "fx:id=\"rankingList\"", "#handleRefresh");
+        assertResourceContains("/fxml/match-history.fxml", "fx:id=\"historyList\"", "#handleRefresh");
+        assertResourceContains("/fxml/game-result.fxml", "fx:id=\"standingsList\"", "#handleReturnToLobby");
     }
 
     @Test
@@ -52,6 +66,16 @@ class JavaFxResourcesTest {
         factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
         try (InputStream resource = resource(path)) {
             assertNotNull(factory.newDocumentBuilder().parse(resource).getDocumentElement());
+        }
+    }
+
+    private static void assertResourceContains(String path, String... expectedValues) throws Exception {
+        String content;
+        try (InputStream input = resource(path)) {
+            content = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        for (String expected : expectedValues) {
+            assertTrue(content.contains(expected), () -> path + " does not contain " + expected);
         }
     }
 

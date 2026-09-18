@@ -218,9 +218,9 @@
 - [x] Lobby Screen
 - [x] Room Screen
 - [x] Game Board Screen
-- [ ] Ranking Screen
-- [ ] Match History Screen
-- [ ] Game Result Screen
+- [x] Ranking Screen
+- [x] Match History Screen
+- [x] Game Result Screen
 - [x] Render 48 ring cells
 - [x] Render Finish Track
 - [x] Render Pieces
@@ -252,24 +252,24 @@
 
 # Phase 15 - Integration Testing
 
-- [ ] Full match 2 players
-- [ ] Full match 3 players
-- [ ] Full match 4 players
-- [ ] Concurrent room join
+- [x] Full match 2 players
+- [x] Full match 3 players
+- [x] Full match 4 players
+- [x] Concurrent room join
 - [x] Host leave
 - [x] Player quit
-- [ ] Disconnect
+- [x] Disconnect
 - [x] Reconnect
-- [ ] Timeout
+- [x] Timeout
 - [x] Grace-period forfeit
-- [ ] Invalid frame
-- [ ] Oversized frame
-- [ ] Malformed JSON
-- [ ] Partial frame
-- [ ] Duplicate request
-- [ ] Wrong-turn request
-- [ ] Database integrity
-- [ ] Ranking integrity
+- [x] Invalid frame
+- [x] Oversized frame
+- [x] Malformed JSON
+- [x] Partial frame
+- [x] Duplicate request
+- [x] Wrong-turn request
+- [x] Database integrity
+- [x] Ranking integrity
 
 ---
 
@@ -312,6 +312,6 @@ Một task lớn được đánh `[x]` khi phạm vi triển khai local đáp �
 
 Hiện tại ưu tiên:
 
-1. Xây dựng Ranking, Match History và Game Result Screen.
-2. Bổ sung full-match integration test cho phòng 2, 3 và 4 người.
-3. Bổ sung các network/integration test còn thiếu trong Phase 15.
+1. Duy trì Maven `verify` và MySQL integration test xanh trên CI.
+2. Rà soát thủ công luồng UI nhiều Client trước demo.
+3. Phase 14 và Phase 16 được thực hiện theo kế hoạch riêng khi nhóm ưu tiên.

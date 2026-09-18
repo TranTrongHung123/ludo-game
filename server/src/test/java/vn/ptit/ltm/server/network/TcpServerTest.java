@@ -7,9 +7,11 @@ import vn.ptit.ltm.common.protocol.JsonMessageCodec;
 import vn.ptit.ltm.common.protocol.MessageEnvelope;
 import vn.ptit.ltm.common.protocol.MessageFactory;
 import vn.ptit.ltm.common.protocol.MessageIO;
+import vn.ptit.ltm.common.protocol.ProtocolConstants;
 
 import java.io.DataOutputStream;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -148,6 +150,109 @@ class TcpServerTest {
                 assertTrue(validMessageReceived.await(2, TimeUnit.SECONDS));
                 assertTrue(server.isRunning());
             }
+        }
+    }
+
+    @Test
+    void closesConnectionsForZeroAndExplicitlyOversizedFrames() throws Exception {
+        CountDownLatch disconnected = new CountDownLatch(2);
+        ConnectionListener listener = new ConnectionListener() {
+            @Override
+            public void onDisconnected(ClientConnection connection) {
+                disconnected.countDown();
+            }
+        };
+
+        try (TcpServer server = new TcpServer(0, 2, (connection, message) -> { }, listener)) {
+            server.start();
+            sendLengthOnly(server.port(), 0);
+            sendLengthOnly(server.port(), ProtocolConstants.MAX_FRAME_LENGTH + 1);
+
+            assertTrue(disconnected.await(2, TimeUnit.SECONDS));
+            assertTrue(server.isRunning());
+        }
+    }
+
+    @Test
+    void malformedJsonClosesOnlyTheViolatingConnection() throws Exception {
+        CountDownLatch disconnected = new CountDownLatch(1);
+        CountDownLatch validMessageReceived = new CountDownLatch(1);
+        ConnectionListener listener = new ConnectionListener() {
+            @Override
+            public void onDisconnected(ClientConnection connection) {
+                disconnected.countDown();
+            }
+        };
+
+        try (TcpServer server = new TcpServer(
+                0,
+                2,
+                (connection, message) -> validMessageReceived.countDown(),
+                listener
+        )) {
+            server.start();
+            byte[] malformed = "{not-valid-json".getBytes(StandardCharsets.UTF_8);
+            try (Socket socket = new Socket("127.0.0.1", server.port())) {
+                DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+                output.writeInt(malformed.length);
+                output.write(malformed);
+                output.flush();
+                assertTrue(disconnected.await(2, TimeUnit.SECONDS));
+            }
+
+            sendValidHeartbeat(server.port());
+            assertTrue(validMessageReceived.await(2, TimeUnit.SECONDS));
+            assertTrue(server.isRunning());
+        }
+    }
+
+    @Test
+    void partialFrameDisconnectIsContainedAndServerKeepsServing() throws Exception {
+        CountDownLatch disconnected = new CountDownLatch(1);
+        CountDownLatch validMessageReceived = new CountDownLatch(1);
+        ConnectionListener listener = new ConnectionListener() {
+            @Override
+            public void onDisconnected(ClientConnection connection) {
+                disconnected.countDown();
+            }
+        };
+
+        try (TcpServer server = new TcpServer(
+                0,
+                2,
+                (connection, message) -> validMessageReceived.countDown(),
+                listener
+        )) {
+            server.start();
+            Socket partialClient = new Socket("127.0.0.1", server.port());
+            DataOutputStream output = new DataOutputStream(partialClient.getOutputStream());
+            output.writeInt(32);
+            output.write(new byte[]{1, 2, 3});
+            output.flush();
+            partialClient.close();
+
+            assertTrue(disconnected.await(2, TimeUnit.SECONDS));
+            sendValidHeartbeat(server.port());
+            assertTrue(validMessageReceived.await(2, TimeUnit.SECONDS));
+            assertTrue(server.isRunning());
+        }
+    }
+
+    private static void sendLengthOnly(int port, int length) throws Exception {
+        try (Socket socket = new Socket("127.0.0.1", port)) {
+            DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+            output.writeInt(length);
+            output.flush();
+        }
+    }
+
+    private static void sendValidHeartbeat(int port) throws Exception {
+        MessageFactory messageFactory = new MessageFactory(new JsonMessageCodec().objectMapper());
+        try (Socket socket = new Socket("127.0.0.1", port)) {
+            new MessageIO().write(
+                    socket.getOutputStream(),
+                    messageFactory.event(MessageType.PONG, new HeartbeatPayload(System.currentTimeMillis()))
+            );
         }
     }
 

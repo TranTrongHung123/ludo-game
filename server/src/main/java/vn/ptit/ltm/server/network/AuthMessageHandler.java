@@ -51,6 +51,7 @@ public final class AuthMessageHandler implements MessageHandler {
     private final RankingService rankingService;
     private final PayloadMapper payloadMapper;
     private final MessageFactory messageFactory;
+    private final RequestIdRegistry requestIds = new RequestIdRegistry();
 
     public AuthMessageHandler(
             AuthService authService,
@@ -134,6 +135,12 @@ public final class AuthMessageHandler implements MessageHandler {
 
         try {
             requireRequestId(message.requestId());
+            if (!requestIds.register(connection.id(), message.requestId())) {
+                throw new AuthException(
+                        ErrorCode.INVALID_REQUEST,
+                        "Duplicate requestId"
+                );
+            }
             switch (message.type()) {
                 case REGISTER -> handleRegister(connection, message);
                 case LOGIN -> handleLogin(connection, message);

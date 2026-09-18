@@ -133,6 +133,16 @@ public final class LobbyController implements ConnectionAwareController {
     }
 
     @FXML
+    private void handleShowRanking() {
+        navigator.showRanking();
+    }
+
+    @FXML
+    private void handleShowMatchHistory() {
+        navigator.showMatchHistory();
+    }
+
+    @FXML
     private void handleAcceptInvitation() {
         var invitation = sessionState.invitation().orElse(null);
         if (invitation == null) {

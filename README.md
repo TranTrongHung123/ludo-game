@@ -110,6 +110,8 @@ Chi tiết đầy đủ xem [`AGENTS.md`](./AGENTS.md).
 
 ## Build
 
+Hướng dẫn chạy ngắn bằng PowerShell xem tại [`RUN.md`](./RUN.md).
+
 Project sử dụng Maven multi-module.
 
 Build toàn bộ project bằng Maven Wrapper (không cần cài Maven riêng):
@@ -235,6 +237,7 @@ Server hiện hỗ trợ end-to-end:
 - lưu `matches`, `match_players`, cộng điểm và tăng số lần hạng nhất trong cùng một transaction khi trận kết thúc;
 - chống lưu/cộng điểm lặp bằng public match ID duy nhất; `GAME_OVER` dùng tổng điểm đã đọc lại từ database;
 - hỗ trợ `GET_RANKING` và `GET_MATCH_HISTORY` qua TCP; lịch sử trả tối đa 50 trận gần nhất của account đang đăng nhập.
+- chặn request bị phát lại với cùng `requestId` trên cùng connection trong cửa sổ retry, tránh action nghiệp vụ bị thực thi hai lần.
 
 Không log plain-text password, password hash hay session token.
 
@@ -266,11 +269,13 @@ Client hiện hỗ trợ:
 - render dice, phase, countdown theo deadline Server, lượt hiện tại và vị trí `stepCount` mới nhất từ Game State;
 - nhận `TURN_TIMEOUT`, khóa thao tác khi deadline đã hết và hiển thị phản hồi timeout;
 - tự thử nối lại trong grace period, gửi `RECONNECT` bằng session cũ và chỉ mở lại thao tác sau khi đã nhận full Room/Game State cùng deadline authoritative;
-- nhận `GAME_OVER` và hiển thị bảng hạng, bao gồm người `FORFEITED` với 0 điểm;
-- nút `Bỏ cuộc` yêu cầu xác nhận rõ hậu quả trước khi gửi `LEAVE_ROOM`; sau `GAME_OVER` nút đổi thành `Về sảnh` và dọn Room/Game State cục bộ khi Server xác nhận;
-- có API bất đồng bộ cho Ranking và Match History để các màn hình tương ứng render dữ liệu authoritative từ Server;
+- nhận `GAME_OVER` và tự chuyển sang Game Result Screen riêng, hiển thị thứ hạng, màu quân, điểm nhận, tổng điểm và người `FORFEITED` với 0 điểm;
+- nút `Bỏ cuộc` yêu cầu xác nhận rõ hậu quả trước khi gửi `LEAVE_ROOM`; Game Result Screen có nút `Về sảnh` và chỉ dọn Room/Game State cục bộ sau khi Server xác nhận;
+- có Ranking Screen và Match History Screen tải bất đồng bộ dữ liệu authoritative từ Server, hỗ trợ làm mới và quay lại Lobby;
 - tự làm mới điểm và số lần hạng nhất trong profile cục bộ từ snapshot Lobby do Server broadcast;
 - toàn bộ connect, send, receive và timeout chạy ngoài JavaFX Application Thread.
+
+Test suite còn mô phỏng trọn ván 2/3/4 người từ lúc toàn bộ quân ở chuồng tới cascading Game Over, đồng thời kiểm tra TCP invalid/oversized/malformed/partial frame, duplicate request, wrong-turn, timeout, disconnect/reconnect và tính toàn vẹn ranking/lịch sử.
 
 ## Workflow phát triển
 
@@ -309,6 +314,7 @@ Jira Task
 - [`AGENTS.md`](./AGENTS.md): đặc tả kỹ thuật và luật dành cho developer / AI coding agent.
 - [`PLAN.md`](./PLAN.md): checklist tiến độ kỹ thuật toàn dự án.
 - [`README.md`](./README.md): giới thiệu nhanh repository, kiến trúc và cách làm việc.
+- [`RUN.md`](./RUN.md): các lệnh ngắn để chạy database, Server, Client và test.
 
 ## Thành viên
 

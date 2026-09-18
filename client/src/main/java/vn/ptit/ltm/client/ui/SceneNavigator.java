@@ -5,8 +5,11 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 import vn.ptit.ltm.client.controller.ConnectionAwareController;
+import vn.ptit.ltm.client.controller.GameResultController;
 import vn.ptit.ltm.client.controller.LobbyController;
 import vn.ptit.ltm.client.controller.LoginController;
+import vn.ptit.ltm.client.controller.MatchHistoryController;
+import vn.ptit.ltm.client.controller.RankingController;
 import vn.ptit.ltm.client.controller.RegisterController;
 import vn.ptit.ltm.client.controller.RoomController;
 import vn.ptit.ltm.client.controller.GameController;
@@ -42,6 +45,7 @@ public final class SceneNavigator {
         LoginController controller = loader.getController();
         controller.configure(authService, this, username, notice);
         show(root, controller, "Đăng nhập");
+        ensureAuthenticationWindowSize();
     }
 
     public void showRegister(String username) {
@@ -79,6 +83,30 @@ public final class SceneNavigator {
         controller.configure(authService, sessionState, this);
         show(root, controller, "Trận đấu");
         ensureGameWindowSize();
+    }
+
+    public void showRanking() {
+        FXMLLoader loader = loader("/fxml/ranking.fxml");
+        Parent root = load(loader);
+        RankingController controller = loader.getController();
+        controller.configure(authService, sessionState, this);
+        show(root, controller, "Bảng xếp hạng");
+    }
+
+    public void showMatchHistory() {
+        FXMLLoader loader = loader("/fxml/match-history.fxml");
+        Parent root = load(loader);
+        MatchHistoryController controller = loader.getController();
+        controller.configure(authService, sessionState, this);
+        show(root, controller, "Lịch sử trận đấu");
+    }
+
+    public void showGameResult() {
+        FXMLLoader loader = loader("/fxml/game-result.fxml");
+        Parent root = load(loader);
+        GameResultController controller = loader.getController();
+        controller.configure(authService, sessionState, this);
+        show(root, controller, "Kết quả trận đấu");
     }
 
     public void onConnectionStateChanged(ConnectionState state) {
@@ -119,6 +147,12 @@ public final class SceneNavigator {
             stage.setHeight(Math.max(stage.getHeight(), 720.0));
             stage.centerOnScreen();
         }
+    }
+
+    private void ensureAuthenticationWindowSize() {
+        stage.setMinWidth(960.0);
+        stage.setMinHeight(600.0);
+        stage.setMaximized(true);
     }
 
     private static FXMLLoader loader(String resourcePath) {
