@@ -42,6 +42,12 @@
                        wrapText="true"/>
                 <Button fx:id="createRoomButton" maxWidth="Infinity" onAction="#handleCreateRoom"
                         styleClass="primary-button" text="Tạo phòng"/>
+                <HBox spacing="8.0">
+                    <Button maxWidth="Infinity" onAction="#handleShowRanking" styleClass="secondary-button"
+                            text="Bảng xếp hạng" HBox.hgrow="ALWAYS"/>
+                    <Button maxWidth="Infinity" onAction="#handleShowMatchHistory" styleClass="secondary-button"
+                            text="Lịch sử" HBox.hgrow="ALWAYS"/>
+                </HBox>
                 <Label styleClass="field-label" text="Mã phòng"/>
                 <TextField fx:id="roomIdField" promptText="Nhập mã phòng"/>
                 <Button fx:id="joinRoomButton" maxWidth="Infinity" onAction="#handleJoinRoom"

@@ -80,6 +80,19 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <resource>
+                <directory>../ui</directory>
+                <targetPath>images</targetPath>
+                <includes>
+                    <include>login.png</include>
+                </includes>
+            </resource>
+        </resources>
+
         <plugins>
             <plugin>
                 <groupId>org.openjfx</groupId>

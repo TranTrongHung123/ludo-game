@@ -421,16 +421,12 @@ public final class GameController implements ConnectionAwareController {
         ));
     }
 
-    /** Hiển thị bảng hạng authoritative, bao gồm người bị FORFEITED với điểm 0. */
+    /** Chuyển sang màn hình kết quả với bảng hạng authoritative do Server gửi. */
     private void renderGameOver() {
         render();
-        sessionState.gameOver().ifPresent(result -> showFeedback(
-                "Trận đấu kết thúc: " + result.standings().stream()
-                        .map(standing -> "hạng " + standing.rank() + " - " + standing.displayName())
-                        .reduce((left, right) -> left + "; " + right)
-                        .orElse("không có kết quả"),
-                false
-        ));
+        if (sessionState.gameOver().isPresent()) {
+            navigator.showGameResult();
+        }
     }
 
     private static String formatPiece(PieceDto piece) {

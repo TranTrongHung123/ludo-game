@@ -363,3 +363,194 @@
 .legend-lucky { -fx-text-fill: #a47a05; }
 .legend-trap { -fx-text-fill: #b33d3d; }
 .legend-shield { -fx-text-fill: #6545c5; }
+
+.data-header {
+    -fx-background-color: #eeeafd;
+    -fx-background-radius: 9px;
+    -fx-padding: 10px 14px;
+}
+
+.data-header .label {
+    -fx-text-fill: #5138bd;
+    -fx-font-size: 12px;
+    -fx-font-weight: 800;
+}
+
+.data-row {
+    -fx-padding: 9px 8px;
+}
+
+.ranking-position,
+.ranking-podium {
+    -fx-min-width: 48px;
+    -fx-font-size: 17px;
+    -fx-font-weight: 900;
+    -fx-text-fill: #657089;
+}
+
+.ranking-podium {
+    -fx-text-fill: #7c3aed;
+}
+
+.ranking-name {
+    -fx-font-size: 15px;
+    -fx-font-weight: 800;
+    -fx-text-fill: #172033;
+}
+
+.ranking-score,
+.result-win {
+    -fx-font-weight: 800;
+    -fx-text-fill: #188653;
+}
+
+.result-rank {
+    -fx-font-weight: 800;
+    -fx-text-fill: #5138bd;
+}
+
+.result-forfeit {
+    -fx-font-weight: 700;
+    -fx-text-fill: #b92f42;
+}
+
+.list-cell.current-player-row {
+    -fx-background-color: #f0edff;
+    -fx-background-radius: 9px;
+}
+
+/* Full-screen login overlay for ui/login.png ---------------------------- */
+
+.login-background-root {
+    -fx-background-color: #f7f7ff;
+}
+
+.login-background-input,
+.login-background-input:focused {
+    -fx-background-color: #ffffff;
+    -fx-background-radius: 0;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-font-size: 16px;
+    -fx-padding: 0 8px;
+    -fx-prompt-text-fill: #aaaeba;
+    -fx-text-fill: #23283c;
+}
+
+.login-background-password,
+.login-background-password:focused {
+    -fx-background-color: #f5f6f9;
+}
+
+.login-password-toggle {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0;
+    -fx-font-family: "Segoe UI Symbol";
+    -fx-font-size: 19px;
+    -fx-font-weight: 700;
+    -fx-padding: 0;
+    -fx-text-fill: transparent;
+}
+
+.login-password-toggle:hover {
+    -fx-background-color: rgba(104, 63, 224, 0.06);
+}
+
+.login-password-toggle.password-visible {
+    -fx-background-color: #f5f6f9;
+    -fx-text-fill: #69738e;
+}
+
+.login-background-remember {
+    -fx-background-color: #ffffff;
+    -fx-font-size: 15px;
+    -fx-padding: 5px 7px 5px 4px;
+    -fx-text-fill: #4f5873;
+}
+
+.login-background-remember > .box {
+    -fx-background-color: white;
+    -fx-background-radius: 4px;
+    -fx-border-color: #aaaec0;
+    -fx-border-radius: 4px;
+}
+
+.login-background-remember:selected > .box {
+    -fx-background-color: #7147e8;
+    -fx-border-color: #7147e8;
+}
+
+.login-background-remember:selected > .box > .mark {
+    -fx-background-color: white;
+}
+
+.login-image-hotspot,
+.login-image-submit {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+}
+
+.login-image-hotspot:hover {
+    -fx-background-color: rgba(104, 63, 224, 0.06);
+    -fx-background-radius: 9px;
+}
+
+.login-image-submit {
+    -fx-background-radius: 16px;
+}
+
+.login-image-submit:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.10);
+}
+
+.login-image-submit:pressed {
+    -fx-background-color: rgba(47, 17, 142, 0.14);
+}
+
+.login-image-submit:disabled {
+    -fx-background-color: rgba(255, 255, 255, 0.38);
+    -fx-opacity: 1;
+}
+
+.login-overlay-feedback {
+    -fx-background-color: rgba(255, 255, 255, 0.96);
+    -fx-background-radius: 8px;
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+    -fx-padding: 2px 8px;
+}
+
+.login-background-connection {
+    -fx-background-radius: 11px;
+    -fx-font-size: 16px;
+    -fx-font-weight: 800;
+}
+
+.login-background-connection.connection-online {
+    -fx-background-color: #e8f7ef;
+    -fx-text-fill: #07974b;
+}
+
+.login-background-connection.connection-connecting {
+    -fx-background-color: #fff7df;
+    -fx-text-fill: #a06f00;
+}
+
+.login-background-connection.connection-offline {
+    -fx-background-color: #fff0f1;
+    -fx-text-fill: #bd3b4c;
+}
+
+.login-background-retry {
+    -fx-background-color: #fff0f1;
+    -fx-background-radius: 11px;
+    -fx-font-size: 16px;
+    -fx-font-weight: 800;
+    -fx-text-fill: #bd3b4c;
+}
+
+.login-background-retry:hover {
+    -fx-background-color: #ffe2e5;
+}
