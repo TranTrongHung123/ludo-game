@@ -17,7 +17,7 @@ using UnityEngine.SceneManagement;
 public static class VerifyGame
 {
     static int checks, rolls, moves, leaves, reconnects;
-    static bool wire=true, rejectMove=true;
+    static bool wire=true, rejectMove=true, rejectLeave=false;
     static TcpListener listener;
     static TcpClient peer;
     static NetworkStream stream;
@@ -33,6 +33,34 @@ public static class VerifyGame
     static GameController Controller=>UnityEngine.Object.FindFirstObjectByType<GameController>();
     static UnityEngine.UI.Button Button(string path)=>Controller.transform.Find("Content/"+path).GetComponent<UnityEngine.UI.Button>();
     static TMP_Text Text(string path)=>Controller.transform.Find("Content/"+path).GetComponent<TMP_Text>();
+    static ResultController Result=>UnityEngine.Object.FindFirstObjectByType<ResultController>();
+    static TMP_Text ResultText(string path)=>Result.transform.Find("Content/"+path).GetComponent<TMP_Text>();
+    static UnityEngine.UI.Button ResultButton=>Result.transform.Find("Content/LobbyButton").GetComponent<UnityEngine.UI.Button>();
+    static void CaptureResult(int width,int height)
+    {
+        var canvas=Result.GetComponent<Canvas>();var camera=Camera.main;
+        var mode=canvas.renderMode;var priorCamera=canvas.worldCamera;float distance=canvas.planeDistance;
+        var previous=camera.targetTexture;var active=RenderTexture.active;int mask=camera.cullingMask;
+        var rt=new RenderTexture(width,height,24);Texture2D texture=null;
+        try
+        {
+            camera.targetTexture=rt;camera.cullingMask=-1;canvas.renderMode=RenderMode.ScreenSpaceCamera;canvas.worldCamera=camera;canvas.planeDistance=10;
+            Canvas.ForceUpdateCanvases();camera.Render();RenderTexture.active=rt;
+            texture=new Texture2D(width,height,TextureFormat.RGB24,false);texture.ReadPixels(new Rect(0,0,width,height),0,0);texture.Apply();
+            System.IO.File.WriteAllBytes("Documentation/result-"+width+"x"+height+"-fixture.png",texture.EncodeToPNG());
+            var corners=new Vector3[4];var content=Result.transform.Find("Content");
+            foreach(var rect in content.GetComponentsInChildren<RectTransform>())
+            {
+                rect.GetWorldCorners(corners);
+                Check(corners.All(c=>{var point=RectTransformUtility.WorldToScreenPoint(camera,c);return point.x>=-1&&point.x<=width+1&&point.y>=-1&&point.y<=height+1;}),"Result bounds "+rect.name+" at "+width);
+            }
+        }
+        finally
+        {
+            canvas.renderMode=mode;canvas.worldCamera=priorCamera;canvas.planeDistance=distance;camera.targetTexture=previous;camera.cullingMask=mask;RenderTexture.active=active;
+            rt.Release();UnityEngine.Object.DestroyImmediate(rt);if(texture!=null)UnityEngine.Object.DestroyImmediate(texture);Canvas.ForceUpdateCanvases();
+        }
+    }
     static long Now=>DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     static JObject Snapshot()
     {
@@ -78,7 +106,11 @@ public static class VerifyGame
                             state["stateVersion"]=(long)state["stateVersion"]+1;state["participants"][0]["pieces"][0]["stepCount"]=0;state["participants"][0]["pieces"][0]["state"]="ON_TRACK";state["turnState"]="WAITING_FOR_ROLL";state["validPieceIds"]=new JArray();state["phaseDurationMillis"]=8000;state["serverDeadlineEpochMillis"]=Now+8000;
                             response["data"]=new JObject{["piece"]=state["participants"][0]["pieces"][0].DeepClone(),["gameState"]=state.DeepClone(),["bonusRoll"]=true,["shieldConsumed"]=false};break;
                         case "RECONNECT":reconnects++;response["type"]="RECONNECT_RESULT";response["data"]=new JObject{["restored"]=true,["room"]=room.DeepClone(),["gameState"]=state.DeepClone()};break;
-                        case "LEAVE_ROOM":leaves++;await Task.Delay(250);break;
+                        case "LEAVE_ROOM":
+                            leaves++;wire&=request["data"] is JObject leave&&leave.Count==1&&(string)leave["roomId"]=="fixture-room";
+                            await Task.Delay(250);
+                            if(rejectLeave){response["type"]="ERROR";response["success"]=false;response["error"]=new JObject{["code"]="INTERNAL_SERVER_ERROR"};}
+                            break;
                         case "LOGOUT":break;
                         default:wire=false;break;
                     }
@@ -93,7 +125,7 @@ public static class VerifyGame
     public static async Task<string> Main()
     {
         if(!UnityEditor.EditorApplication.isPlaying)throw new Exception("Requires Play Mode with offline Login scene.");
-        checks=rolls=moves=leaves=reconnects=0;wire=true;rejectMove=true;
+        checks=rolls=moves=leaves=reconnects=0;wire=true;rejectMove=true;rejectLeave=false;
         session=NetworkSession.Instance;await Until(()=>session!=null&&session.State!=ConnectionState.Connecting,"offline session");
         if(session.State!=ConnectionState.Disconnected||session.SessionId!=null)throw new Exception("Requires offline unauthenticated session.");
         Check(Enumerable.Range(0,48).Select(BoardGeometry.Ring).Distinct().Count()==48,"48 distinct ring cells");
@@ -125,11 +157,41 @@ public static class VerifyGame
             await Until(()=>reconnects==1&&session.State==ConnectionState.Connected,"reconnect");Check(Text("Player1/Status").text.StartsWith("Mất kết nối"),"Reconnect snapshot presence rendered");
             state["participants"][1]["matchStatus"]="FORFEITED";state["stateVersion"]=(long)state["stateVersion"]+1;await Event("GAME_STATE_UPDATED",state);await Until(()=>UnityEngine.Object.FindObjectsByType<PieceView>(FindObjectsSortMode.None).Length==12,"forfeit pieces removed");Check(true,"Forfeited player has no pieces on board");
             state["roomState"]="FINISHED";state["turnState"]="FINISHED";state["currentPlayerId"]=null;state["currentSlot"]=null;state["serverDeadlineEpochMillis"]=null;state["participants"][0]["rank"]=1;state["participants"][0]["scoreEarned"]=10;state["stateVersion"]=(long)state["stateVersion"]+1;await Event("GAME_STATE_UPDATED",state);
-            await Event("GAME_OVER",new JObject{["roomId"]="fixture-room",["matchId"]="fixture-match",["standings"]=new JArray()});await Until(()=>Text("LeaveButton/Label").text=="Về sảnh","finished UI");Check(Text("Feedback").text.Contains("hạng 1"),"Server rank shown without ResultScene");
-            Controller.Leave();await Until(()=>SceneManager.GetActiveScene().name=="LobbyScene","leave completed game");Check(session.GameState==null&&session.GameOver==null,"Leaving clears game cache");
+            var standings=new JArray();
+            for(int i=3;i>=0;i--)standings.Add(new JObject{["playerId"]="p"+i,["displayName"]=i==0?"Người kiểm thử":i==1?"<b>Tên dài không dùng rich text</b>":"Người chơi "+i,["rank"]=i+1,["color"]=BoardGeometry.Colors[i],["matchStatus"]=i==3?"FORFEITED":"COMPLETED",["scoreEarned"]=new decimal[]{3,1.5m,.5m,0}[i],["totalScore"]=new decimal[]{13,21.5m,7.5m,0}[i]});
+            var result=new JObject{["roomId"]="fixture-room",["matchId"]="fixture-match",["standings"]=standings};
+            var foreign=(JObject)result.DeepClone();foreign["matchId"]="wrong-match";await Event("GAME_OVER",foreign);await Task.Delay(150);
+            Check(SceneManager.GetActiveScene().name=="GameScene"&&session.GameOver==null,"Foreign match result ignored");
+            await Event("GAME_OVER",result);await Until(()=>Result!=null,"Game to Result transition");await Task.Delay(150);
+            Check(ResultText("Headline").text=="Bạn về hạng 1!","Authoritative placement headline");
+            Check(ResultText("ResultsCard/ResultRow0/Total").text=="13","Server total is displayed directly");
+            Check(ResultText("ResultsCard/ResultRow1/Earned").text=="+1.5","Fractional score preserved");
+            Check(ResultText("ResultsCard/ResultRow3/Status").text=="Đã bỏ cuộc","Forfeit distinguished from completion");
+            Check(Result.transform.Find("Content/ResultsCard/ResultRow0/SelfBadge").gameObject.activeSelf,"Current player badge");
+            Check(!ResultText("ResultsCard/ResultRow1/PlayerName").richText,"Names cannot inject TMP markup");
+            Check(UnityEngine.Object.FindObjectsByType<ResultRowView>(FindObjectsSortMode.None).Length==4,"Four standings rendered in rank order");
+            CaptureResult(1920,1080);CaptureResult(2560,1440);CaptureResult(3840,2160);
+            peer.Close();await Until(()=>session.State!=ConnectionState.Connected,"result disconnect");
+            Check(!ResultButton.interactable,"Result leave disabled offline");
+            Check(ResultText("ResultsCard/ResultRow0/Total").text=="13","Result retained offline");
+            await Until(()=>session.State==ConnectionState.Connected&&reconnects==2,"result reconnect");
+            Check(ResultButton.interactable&&session.GameOver!=null,"Reconnect preserves official result");
+            var smaller=(JObject)result.DeepClone();smaller["standings"]=new JArray(standings[2].DeepClone(),standings[3].DeepClone());
+            smaller["standings"][1]["matchStatus"]="FORFEITED";smaller["standings"][1]["scoreEarned"]=0;
+            await Event("GAME_OVER",smaller);await Until(()=>ResultText("Headline").text.StartsWith("Bạn đã bỏ cuộc"),"forfeit headline");
+            Check(UnityEngine.Object.FindObjectsByType<ResultRowView>(FindObjectsSortMode.None).Length==2,"Two-player result hides unused rows");
+            Check(ResultText("ResultsCard/ResultRow0/Earned").text=="+0","Forfeit score comes from server");
+            await Event("GAME_OVER",result);await Until(()=>ResultText("Headline").text=="Bạn về hạng 1!","duplicate result update");
+            rejectLeave=true;int priorLeaves=leaves;ResultButton.onClick.Invoke();ResultButton.onClick.Invoke();
+            Check(!ResultButton.interactable&&session.Room!=null,"Leave pending locks button and keeps room");
+            await Until(()=>ResultText("Feedback").text.StartsWith("Chưa thể rời phòng"),"leave rejection");
+            Check(leaves==priorLeaves+1&&ResultButton.interactable,"Leave rejection permits retry; duplicate suppressed");
+            Check(session.GameOver!=null&&SceneManager.GetActiveScene().name=="ResultScene","Rejected leave retains results");
+            rejectLeave=false;ResultButton.onClick.Invoke();Check(SceneManager.GetActiveScene().name=="ResultScene","Result waits for leave acknowledgement");
+            await Until(()=>SceneManager.GetActiveScene().name=="LobbyScene","leave completed game");Check(session.GameState==null&&session.GameOver==null,"Leaving clears game cache");
             state=Snapshot();state["matchId"]="fixture-second-match";await session.EnterRoomAsync("CREATE_ROOM");await session.StartGameAsync();await Until(()=>Controller!=null,"second game");await Task.Delay(100);
             int count=leaves;Controller.Leave();Check(Controller.transform.Find("Content/ForfeitConfirmation").gameObject.activeSelf&&leaves==count,"Forfeit opens confirmation only");Button("ForfeitConfirmation/Dialog/CancelButton").onClick.Invoke();Check(leaves==count,"Cancel sends no leave");Controller.Leave();Controller.ConfirmLeave();Controller.ConfirmLeave();Check(SceneManager.GetActiveScene().name=="GameScene","Waits for leave acknowledgement");await Until(()=>SceneManager.GetActiveScene().name=="LobbyScene","forfeit leave");Check(leaves==count+1,"Confirmed forfeit sent once");Check(wire,"Canonical request types, session and intent-only payloads");
-            await session.LogoutAsync();return checks+" Game checks passed (TCP localhost fixture).";
+            await session.LogoutAsync();return checks+" Game/Result checks passed (TCP localhost fixture).";
         }
         finally
         {
