@@ -58,6 +58,7 @@ namespace Ludo.Controllers
         private void Render()
         {
             if (navigating || Game == null) return;
+            if (session.GameOver != null && Application.CanStreamedLevelBeLoaded("ResultScene")) { Go("ResultScene"); return; }
             if (awaitingStateVersion != null && (long?)Game["stateVersion"] > awaitingStateVersion) awaitingStateVersion = null;
             roomLabel.text = "PHÒNG  " + (string)Game["roomId"];
             matchLabel.text = "Trận " + (string)Game["matchId"];
@@ -76,7 +77,6 @@ namespace Ludo.Controllers
             {
                 var rank = Self?["rank"];
                 feedback.text = rank?.Type == JTokenType.Integer ? "Kết thúc • Bạn về hạng " + rank + " • Điểm nhận: " + Self?["scoreEarned"] : "Trận đấu đã kết thúc. Bạn có thể về sảnh.";
-                if (session.GameOver != null && Application.CanStreamedLevelBeLoaded("ResultScene")) Go("ResultScene");
             }
         }
         private bool moveAllowedLastFrame;

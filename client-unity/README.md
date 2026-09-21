@@ -1,4 +1,4 @@
-# Unity Login, Register, Lobby & Room
+# Unity Login, Register, Lobby, Room, Game, Result, Ranking & History
 
 Mở project `client-unity` bằng Unity **6000.3.24f1**, mở
 `Assets/Scenes/LoginScene.unity` và nhấn **Play**. LoginScene đã là scene đầu trong Build Settings.
@@ -44,7 +44,7 @@ Player Settings bật Run In Background để cập nhật trạng thái mạng 
 
 Lobby hỗ trợ tự kết nối lại và gửi `RECONNECT` bằng session cũ trong thời gian tối đa
 60 giây. Chỉ công bố connected sau khi Server xác nhận khôi phục. Phiên hết hạn quay Login.
-Snapshot room/game được lưu nếu Server gửi lại; màn chơi chưa được triển khai.
+Snapshot room/game được khôi phục nếu Server gửi lại; GameScene render lại bàn cờ từ snapshot.
 Không thay đổi code JavaFX, common, server hoặc luật game.
 
 ## Kiểm tra đã thực hiện
@@ -84,10 +84,10 @@ Runtime hiển thị profile và danh sách thật, không tạo người chơi 
 - Lời mời hiển thị người mời, roomId và thời gian còn lại từ deadline Server gửi.
   Server quyết định lời mời hợp lệ; UI ẩn lời mời đã hết hạn và bảo toàn lời mời mới
   nếu response từ chối lời mời cũ đến trễ.
-- RankingScene, HistoryScene chưa được triển khai. Các nút điều hướng
-  báo rõ màn hình chưa có. Tạo/tham gia phòng vẫn gửi request thật và lưu room Server trả;
+- RankingScene và HistoryScene đã có, tải dữ liệu từ Server.
+  Tạo/tham gia phòng gửi request thật và lưu room Server trả;
   sau thành công chuyển đến RoomScene đã có trong Build Settings.
-- Bảng xếp hạng/lịch sử hiện chỉ là điểm nối điều hướng, chưa tải dữ liệu hai màn hình đó.
+- Nút Lịch sử mở HistoryScene và tải lịch sử của tài khoản đang đăng nhập.
 
 `AgentScripts/VerifyLobby.cs`, entry `VerifyLobby.Main`: chạy Play Mode từ Lobby/Login
 khi Server offline. Đã qua 12 kiểm tra với TCP fixture (20 người chơi, scroll, self marker,
@@ -108,15 +108,143 @@ sẽ quay Login; đăng nhập và tạo/tham gia phòng từ Lobby để sử d
   hoặc chọn một dòng rồi Gửi lời mời. Phòng đầy hoặc pending sẽ khóa nút.
 - Start chỉ dành cho host, tối thiểu hai người, tất cả ready và IN_ROOM, phòng WAITING.
 - Nhận ROOM_UPDATED, GAME_STATE/GAME_STATE_UPDATED và snapshot reconnect.
-- GameScene chưa triển khai. START_GAME vẫn là request thật: Server có thể bắt đầu
-  trận và timer. UI báo rõ màn chơi chưa có, khóa thao tác phòng chờ; không thể chơi
-  ván đó bằng Unity cho đến khi GameScene được bổ sung.
+- START_GAME nhận snapshot thật và chuyển sang GameScene; thành viên khác chuyển
+  màn hình khi nhận GAME_STATE broadcast.
 
 `AgentScripts/VerifyRoom.cs`, entry `VerifyRoom.Main`, chạy Play Mode từ RoomScene
 khi Server chưa kết nối: 15 kiểm tra validation quyền/ready, payload TCP, UI slot,
 mời, chống gửi lặp, leave và start. Test dùng fixture localhost, chưa dùng Java/MySQL thật.
 Các kiểm tra VerifyLoginUi/VerifyLobby cũ có assertion về màn hình chưa tồn tại ở giai đoạn
 trước; cần cập nhật các assertion điều hướng khi chạy lại sau khi bổ sung Lobby/Room.
+VerifyRoom cũng còn assertion GameScene chưa tồn tại; luồng Room → Game hiện được
+kiểm tra trong VerifyGame.
+
+## Màn chơi
+
+Mở `Assets/Scenes/GameScene.unity` để chỉnh giao diện; prefab chính là
+`Assets/Prefabs/Game/GameScreen.prefab`, cùng `PlayerCard`, `Piece`, `Dice`.
+Để chơi, chạy từ LoginScene, đăng nhập, tạo/tham gia phòng, tất cả sẵn sàng rồi bắt đầu.
+Mở GameScene trực tiếp trong Play Mode khi chưa đăng nhập sẽ quay Login.
+
+- Bàn cờ vuông với 48 ô chung, đường về đích và bốn chuồng màu. Vị trí quân,
+  ô đặc biệt, người đang đến lượt và quân hợp lệ đều lấy từ GameState Server.
+- `ROLL_DICE(roomId)` → `DICE_RESULT`; `MOVE_PIECE(roomId, pieceId)` →
+  `MOVE_PIECE_RESULT`. Không gửi số xúc xắc hay vị trí do Client tự quyết định.
+- Khóa thao tác khi pending, mất kết nối, sai lượt hoặc hết deadline. Sau phản hồi
+  đổ xúc xắc vẫn chờ snapshot mới trước khi mở thao tác tiếp theo.
+- Lọc snapshot cũ bằng `stateVersion`, bỏ snapshot của phòng khác; reconnect render
+  lại ngay, không chạy animation đường đi từ trạng thái trước khi mất mạng.
+- Timer dùng `serverDeadlineEpochMillis` và `phaseDurationMillis`; đồng hồ Client
+  chỉ hiển thị/khóa thao tác, không tự đổi lượt. Máy Client cần đồng hồ hệ thống đúng.
+- Xúc xắc bounce/xoay theo kết quả đã nhận; quân di chuyển theo snapshot được xác nhận.
+- Bỏ cuộc có hộp xác nhận và gửi `LEAVE_ROOM`; chỉ về Lobby sau response thành công.
+- Khi nhận `GAME_OVER` đúng trận, chuyển sang ResultScene để hiển thị kết quả
+  chính thức và nút Về sảnh.
+- Khung chat có vị trí riêng bên phải. Gửi chat đang khóa vì Java Server hiện chưa
+  xử lý `CHAT_MESSAGE` (chỉ có enum); không tạo tin nhắn local hoặc protocol mới.
+
+Đã đạt **39 kiểm tra TCP localhost** trong `AgentScripts/VerifyGame.cs`, entry
+`VerifyGame.Main`: mapping, chuyển Room → Game, pending/chống lặp, lỗi nước đi,
+snapshot cũ/khác phòng, timeout hiển thị, reconnect, forfeit, kết thúc và payload.
+Chạy bằng Unity MCP `run_script` trong Play Mode từ LoginScene khi Server offline.
+Chưa kiểm thử end-to-end với Java Server + MySQL thật.
+
+Đã kiểm tra ảnh ở [Full HD](Documentation/game-1920x1080.png),
+[1440p](Documentation/game-2560x1440.png), [4K](Documentation/game-3840x2160.png).
+Các ảnh thể hiện trạng thái chờ dữ liệu, không chứa người chơi mẫu.
+`AgentScripts/CaptureGameUi.cs` chụp Canvas overlay qua camera tạm thời rồi khôi phục cấu hình.
+`AgentScripts/CreateGameUi.cs` chỉ là lệnh authoring một lần ngoài Assets;
+runtime sử dụng scene/prefab đã lưu, không dựng toàn bộ UI bằng code.
+
+## Kết quả trận đấu
+
+Scene `Assets/Scenes/ResultScene.unity` đã có trong Build Settings và dùng prefab
+`Assets/Prefabs/Result/ResultScreen.prefab`; mỗi dòng là `ResultRow.prefab`.
+Unity Editor đang mở màn này để chỉnh trực tiếp. Khi chơi, đi từ Login; nhận
+`GAME_OVER` sẽ tự chuyển Game → Result. Mở Result trực tiếp khi chưa đăng nhập
+sẽ quay Login; chưa có kết quả sẽ quay màn phù hợp với session hiện tại.
+
+- Giữ phong cách lavender, vương miện/confetti, bảng 5 cột và đúng một nút Về sảnh.
+- Hạng, tên hiển thị, màu, trạng thái, điểm nhận và tổng điểm đều từ `GAME_OVER`.
+  Sắp dòng theo rank Server, đánh dấu Bạn, giữ điểm lẻ, ẩn dòng không sử dụng.
+- `LEAVE_ROOM(roomId)` dùng kết nối/session đang có; chờ response thành công mới về Lobby.
+  Khóa nút khi pending/offline, lỗi cho phép thử lại; reconnect giữ kết quả đã nhận
+  nếu vẫn cùng match. Không tự tính điểm hoặc cộng thắng vào profile.
+- Scene/prefab không chứa người chơi mẫu. [Ảnh trống](Documentation/result-1920x1080.png)
+  là trạng thái authoring; ảnh [Full HD](Documentation/result-1920x1080-fixture.png),
+  [1440p](Documentation/result-2560x1440-fixture.png), [4K](Documentation/result-3840x2160-fixture.png)
+  dùng dữ liệu **TCP fixture kiểm thử**, không phải kết quả trận thật.
+- `AgentScripts/CreateResultUi.cs` chỉ authoring một lần ngoài Assets;
+  `CaptureResultUi.cs` chụp màn hiện tại và khôi phục cấu hình Canvas/camera.
+
+`AgentScripts/VerifyGame.cs`, entry `VerifyGame.Main`, đã cập nhật luồng Result:
+**295 assertion đạt**, gồm kiểm tra Game/Result qua TCP localhost và kiểm tra
+biên RectTransform ở ba độ phân giải. Bao phủ sắp hạng, điểm lẻ, 2/4 người,
+bỏ cuộc, chặn rich text trong tên, kết quả khác trận, reconnect, pending,
+chống gửi lặp, lỗi rời phòng và chuyển về Lobby sau xác nhận.
+Chạy trong Play Mode từ Login khi Server offline. Unity compile và Console không
+có lỗi/cảnh báo; các reference controller/row đầy đủ, một EventSystem và GraphicRaycaster.
+Chưa kiểm thử end-to-end với Java Server + MySQL thật.
+
+## Bảng xếp hạng
+
+Scene `Assets/Scenes/RankingScene.unity` đã thêm vào Build Settings, dùng
+`Assets/Prefabs/Ranking/RankingScreen.prefab` và `RankingRow.prefab`.
+Đăng nhập → bấm **Bảng xếp hạng** từ Lobby. Mở scene trực tiếp khi chưa có session
+sẽ quay Login. Scene không chứa dữ liệu người chơi mẫu.
+
+- Tự tải `GET_RANKING` với `data: {}`, nhận `RANKING_RESULT.entries`.
+  Giữ thứ tự và rank do Server trả; hiển thị displayName, totalScore và firstPlaceCount.
+- Top 3 có màu huy chương, hạng nhất có vương miện; đánh dấu người chơi hiện tại.
+  Điểm lẻ được giữ nguyên, tên người chơi không được diễn giải thành rich text.
+- **Làm mới** khóa khi pending/offline; lỗi giữ danh sách trước đó và cho phép thử lại.
+  Có trạng thái tải/rỗng/lỗi; reconnect thành công tự tải lại dữ liệu.
+- Danh sách dùng ScrollRect, tái sử dụng row, ẩn row thừa và trở về đầu khi tải lại.
+- **Về sảnh** vẫn dùng được khi đang tải; response đến trễ không cập nhật scene đã đóng.
+  Điều hướng dùng cùng NetworkSession/TCP connection.
+
+`AgentScripts/VerifyRanking.cs`, entry `VerifyRanking.Main`: **39 kiểm tra đạt**
+qua TCP localhost, gồm payload/session, tải ban đầu, chống lặp, lỗi/malformed/empty,
+rank authoritative, điểm lẻ, self badge, cuộn/tái dùng row, reconnect, điều hướng,
+guard đăng nhập và biên giao diện ở Full HD/1440p/4K. Chạy trong Play Mode từ Login
+khi chưa kết nối Server. Console không warning/error; controller và row không thiếu reference.
+Chưa kiểm thử end-to-end với Java Server + MySQL thật.
+
+[Ảnh trống trong Editor](Documentation/ranking-1920x1080.png).
+Ảnh có dữ liệu từ **fixture kiểm thử**: [Full HD](Documentation/ranking-1920x1080-fixture.png),
+[1440p](Documentation/ranking-2560x1440-fixture.png), [4K](Documentation/ranking-3840x2160-fixture.png).
+`CreateRankingUi.cs` là script authoring một lần ngoài Assets; runtime dùng prefab đã lưu.
+`CaptureRankingUi.cs` chụp màn hiện tại, khôi phục cấu hình Canvas/camera sau khi chụp.
+
+## Lịch sử trận đấu
+
+Scene `Assets/Scenes/HistoryScene.unity` đã có trong Build Settings; prefab chính
+`Assets/Prefabs/History/HistoryScreen.prefab`, dòng lịch sử `HistoryRow.prefab`.
+Đăng nhập → **Lịch sử** từ Lobby. Mở scene trực tiếp khi chưa đăng nhập sẽ quay Login.
+
+- `GET_MATCH_HISTORY` gửi `data: {}` với session hiện tại; nhận `MATCH_HISTORY_RESULT.matches`.
+  Server chọn lịch sử của tài khoản, Client không gửi playerId hoặc tự tạo kết quả.
+- Giữ thứ tự Server trả; mỗi dòng có rank/playerCount, thời gian kết thúc theo giờ
+  địa phương, màu quân, matchId, scoreEarned và trạng thái forfeited.
+- Hạng nhất có vương miện; bỏ cuộc dùng màu đỏ; giữ nguyên điểm lẻ từ Server.
+  Thống kê số trận gần nhất/số lần hạng nhất chỉ tính trên danh sách được trả về.
+- **Làm mới** có pending, chống gửi lặp, trạng thái tải/rỗng/lỗi. Lỗi giữ dữ liệu cũ;
+  reconnect thành công tự tải lại. Danh sách cuộn riêng, tái dùng row và ẩn row thừa.
+- **Về sảnh** dùng cùng kết nối TCP, vẫn hoạt động khi đang tải; phản hồi đến trễ
+  không cập nhật màn hình đã đóng. Không có dữ liệu mẫu trong scene/prefab.
+
+`AgentScripts/VerifyHistory.cs`, entry `VerifyHistory.Main`: **42 kiểm tra đạt**
+qua TCP localhost, gồm protocol/session, rank/số người, timestamp, màu/matchId,
+điểm lẻ, bỏ cuộc, thống kê, pending, lỗi/malformed/empty, cuộn, reconnect và điều hướng.
+Kiểm tra biên giao diện ở Full HD/1440p/4K; Console không warning/error và không thiếu
+reference. Chạy từ Login trong Play Mode khi chưa kết nối Server.
+Chưa kiểm thử end-to-end với Java Server + MySQL thật.
+
+[Ảnh trống trong Editor](Documentation/history-1920x1080.png).
+Ảnh dùng dữ liệu **fixture kiểm thử**: [Full HD](Documentation/history-1920x1080-fixture.png),
+[1440p](Documentation/history-2560x1440-fixture.png), [4K](Documentation/history-3840x2160-fixture.png).
+`CreateHistoryUi.cs` là script authoring một lần ngoài Assets; runtime dùng prefab đã lưu.
+`CaptureHistoryUi.cs` chụp giao diện và khôi phục Canvas/camera sau khi chụp.
 
 ## Tài nguyên
 
