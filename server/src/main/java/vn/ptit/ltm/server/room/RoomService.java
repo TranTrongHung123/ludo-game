@@ -2,6 +2,8 @@ package vn.ptit.ltm.server.room;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import vn.ptit.ltm.common.dto.chat.ChatMessageDto;
+import vn.ptit.ltm.common.dto.chat.SendChatMessageRequest;
 import vn.ptit.ltm.common.dto.room.RoomDto;
 import vn.ptit.ltm.common.dto.room.RoomPayload;
 import vn.ptit.ltm.common.dto.room.InvitationDto;
@@ -431,6 +433,45 @@ public final class RoomService implements AutoCloseable {
     public void broadcastDiceResult(String roomId, DiceResultDto result) {
         roomManager.findById(roomId)
                 .ifPresent(room -> broadcast(room, MessageType.DICE_RESULT, result));
+    }
+
+    public ChatMessageDto sendChatMessage(
+            String sessionId,
+            String connectionId,
+            String roomId,
+            String rawMessage
+    ) {
+        PlayerSession session = sessionManager.requireAuthenticated(sessionId, connectionId);
+        if (rawMessage == null || rawMessage.isBlank()) {
+            throw new RoomException(ErrorCode.INVALID_REQUEST, "Chat message must not be blank");
+        }
+        String message = rawMessage.trim().replace("<u>", "").replace("</u>", "").trim();
+        if (message.isBlank()) {
+            throw new RoomException(ErrorCode.INVALID_REQUEST, "Chat message must not be blank");
+        }
+        if (message.length() > SendChatMessageRequest.MAX_MESSAGE_LENGTH) {
+            throw new RoomException(ErrorCode.INVALID_REQUEST, "Chat message exceeds maximum length");
+        }
+        GameRoom room = roomManager.findById(roomId)
+                .orElseThrow(() -> new RoomException(ErrorCode.ROOM_NOT_FOUND, "Room does not exist"));
+
+        GameRoom.RoomMemberInfo sender = room.memberInfo(session.user().id());
+
+        return new ChatMessageDto(
+                UUID.randomUUID().toString(),
+                room.roomId(),
+                Long.toString(session.user().id()),
+                sender.displayName(),
+                sender.slotIndex(),
+                sender.color(),
+                message,
+                clock.millis()
+        );
+    }
+
+    public void broadcastChatMessage(String roomId, ChatMessageDto chatMessage) {
+        roomManager.findById(roomId)
+                .ifPresent(room -> broadcast(room, MessageType.CHAT_MESSAGE, chatMessage));
     }
 
     void processExpiredTurns() {

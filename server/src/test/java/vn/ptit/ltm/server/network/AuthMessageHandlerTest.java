@@ -71,4 +71,47 @@ class AuthMessageHandlerTest {
         assertEquals(ErrorCode.INVALID_REQUEST, values.getLast().error().code());
         assertEquals("same-request-id", values.getLast().requestId());
     }
+
+    @Test
+    void routesChatMessageToRoomService() throws Exception {
+        AuthService authService = mock(AuthService.class);
+        SessionManager sessions = mock(SessionManager.class);
+        HeartbeatManager heartbeat = mock(HeartbeatManager.class);
+        vn.ptit.ltm.server.room.RoomService roomService = mock(vn.ptit.ltm.server.room.RoomService.class);
+        ClientConnection connection = mock(ClientConnection.class);
+        when(connection.id()).thenReturn("connection-1");
+
+        vn.ptit.ltm.common.dto.chat.ChatMessageDto chatDto = new vn.ptit.ltm.common.dto.chat.ChatMessageDto(
+                "msg-1", "room-1", "1", "Alice", 0, vn.ptit.ltm.common.enums.PieceColor.RED, "Hello!", 1000L
+        );
+        when(roomService.sendChatMessage("session-1", "connection-1", "room-1", "Hello!"))
+                .thenReturn(chatDto);
+
+        AuthMessageHandler handler = new AuthMessageHandler(
+                authService,
+                sessions,
+                SessionStateProvider.basic(),
+                heartbeat,
+                null,
+                roomService
+        );
+
+        MessageEnvelope request = new MessageFactory(new JsonMessageCodec().objectMapper()).request(
+                MessageType.CHAT_MESSAGE,
+                "req-chat-1",
+                "session-1",
+                new vn.ptit.ltm.common.dto.chat.SendChatMessageRequest("room-1", "Hello!")
+        );
+
+        handler.handle(connection, request);
+
+        verify(roomService, times(1)).sendChatMessage("session-1", "connection-1", "room-1", "Hello!");
+        verify(roomService, times(1)).broadcastChatMessage("room-1", chatDto);
+
+        ArgumentCaptor<MessageEnvelope> responseCaptor = ArgumentCaptor.forClass(MessageEnvelope.class);
+        verify(connection, times(1)).send(responseCaptor.capture());
+        assertEquals(MessageType.CHAT_MESSAGE, responseCaptor.getValue().type());
+        assertEquals("req-chat-1", responseCaptor.getValue().requestId());
+        assertEquals(Boolean.TRUE, responseCaptor.getValue().success());
+    }
 }

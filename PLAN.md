@@ -237,7 +237,7 @@
 
 > Không ưu tiên trước khi core game ổn định.
 
-- [ ] Chat trong phòng
+- [x] Chat trong phòng
 - [ ] Spectator mode
 - [ ] Animation
 - [ ] Sound

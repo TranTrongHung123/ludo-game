@@ -508,6 +508,29 @@ final class GameRoom {
         }
     }
 
+    record RoomMemberInfo(long userId, String displayName, int slotIndex, PieceColor color) {}
+
+    RoomMemberInfo memberInfo(long userId) {
+        lock.lock();
+        try {
+            if (closed || departedUserIds.contains(userId)) {
+                throw new RoomException(ErrorCode.NOT_IN_ROOM, "Player is not in this room");
+            }
+            RoomMember member = membersBySlot.values().stream()
+                    .filter(m -> m.userId() == userId)
+                    .findFirst()
+                    .orElseThrow(() -> new RoomException(ErrorCode.NOT_IN_ROOM, "Player is not in this room"));
+            return new RoomMemberInfo(
+                    member.userId(),
+                    member.displayName(),
+                    member.slotIndex(),
+                    PieceColor.fromSlotIndex(member.slotIndex())
+            );
+        } finally {
+            lock.unlock();
+        }
+    }
+
     List<Long> memberUserIds() {
         lock.lock();
         try {

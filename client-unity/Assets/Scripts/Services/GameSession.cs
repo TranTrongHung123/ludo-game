@@ -53,6 +53,23 @@ namespace Ludo.Services
             if (ApplyGameState(result["gameState"] as JObject)) LobbyChanged?.Invoke();
         }
 
+        public event Action<JObject> ChatReceived;
+
+        private void ApplyChatEvent(JObject data)
+        {
+            if (data == null) return;
+            string room = (string)GameState?["roomId"] ?? (string)Room?["roomId"];
+            if (room != null && (string)data["roomId"] != room) return;
+            ChatReceived?.Invoke(data);
+        }
+
+        public async Task SendChatMessageAsync(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message)) return;
+            string room = (string)GameState?["roomId"] ?? (string)Room?["roomId"] ?? throw new IOException("Phòng không tồn tại.");
+            await AuthenticatedRequest("CHAT_MESSAGE", new JObject { ["roomId"] = room, ["message"] = message.Trim() });
+        }
+
         private void ClearGame() { GameState = null; LastDice = null; GameOver = null; }
     }
 }

@@ -68,6 +68,8 @@ namespace Ludo.Services
                 case "TURN_TIMEOUT":
                 case "GAME_OVER":
                     ApplyGameEvent((string)message["type"], data); return;
+                case "CHAT_MESSAGE":
+                    ApplyChatEvent(data); return;
                 default: return;
             }
             LobbyChanged?.Invoke();

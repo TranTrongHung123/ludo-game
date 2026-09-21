@@ -1,11 +1,26 @@
-/Library/
-/Temp/
-/Obj/
-/Logs/
-/UserSettings/
-/Builds/
-/.vs/
-/*.csproj
-/*.sln
-/*.slnx
+# Unity generated folders
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Bb]uild/
+[Bb]uilds/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+
+# IDE / Project files
+.vs/
+.vscode/
+*.csproj
+*.unityproj
+*.sln
+*.slnx
 *.user
+*.userprefs
+*.suo
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+sysinfo.txt

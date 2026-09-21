@@ -6,6 +6,8 @@ import org.slf4j.LoggerFactory;
 import vn.ptit.ltm.common.dto.EmptyPayload;
 import vn.ptit.ltm.common.dto.auth.LoginRequest;
 import vn.ptit.ltm.common.dto.auth.RegisterRequest;
+import vn.ptit.ltm.common.dto.chat.ChatMessageDto;
+import vn.ptit.ltm.common.dto.chat.SendChatMessageRequest;
 import vn.ptit.ltm.common.dto.room.CreateRoomRequest;
 import vn.ptit.ltm.common.dto.room.JoinRoomRequest;
 import vn.ptit.ltm.common.dto.room.LeaveRoomRequest;
@@ -160,6 +162,7 @@ public final class AuthMessageHandler implements MessageHandler {
                 case START_GAME -> handleStartGame(connection, message);
                 case ROLL_DICE -> handleRollDice(connection, message);
                 case MOVE_PIECE -> handleMovePiece(connection, message);
+                case CHAT_MESSAGE -> handleChatMessage(connection, message);
                 default -> throw new AuthException(
                         ErrorCode.INVALID_REQUEST,
                         "Message type is not supported yet: " + message.type()
@@ -462,6 +465,23 @@ public final class AuthMessageHandler implements MessageHandler {
         } finally {
             roomService.broadcastGameUpdated(request.roomId());
         }
+    }
+
+    private void handleChatMessage(ClientConnection connection, MessageEnvelope message) throws IOException {
+        requireRoomService();
+        SendChatMessageRequest request = payloadMapper.fromTree(message.data(), SendChatMessageRequest.class);
+        ChatMessageDto chatMessage = roomService.sendChatMessage(
+                message.sessionId(),
+                connection.id(),
+                request.roomId(),
+                request.message()
+        );
+        connection.send(messageFactory.response(
+                MessageType.CHAT_MESSAGE,
+                message.requestId(),
+                chatMessage
+        ));
+        roomService.broadcastChatMessage(request.roomId(), chatMessage);
     }
 
     private void requireRoomService() {

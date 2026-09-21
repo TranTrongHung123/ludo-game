@@ -19,6 +19,10 @@ namespace Ludo.Controllers
         [SerializeField] private BoardView board;
         [SerializeField] private DiceView dice;
         [SerializeField] private PlayerCardView[] players;
+        [SerializeField] private TMP_InputField chatInput;
+        [SerializeField] private UnityEngine.UI.Button sendButton;
+        [SerializeField] private TMP_Text chatLog;
+        private readonly System.Collections.Generic.List<string> chatLines = new System.Collections.Generic.List<string>();
         private NetworkSession session;
         private bool busy, navigating, snap = true;
         private string selected;
@@ -44,7 +48,17 @@ namespace Ludo.Controllers
             rollButton.onClick.AddListener(Roll); moveButton.onClick.AddListener(Move);
             leaveButton.onClick.AddListener(Leave); confirmButton.onClick.AddListener(ConfirmLeave);
             cancelButton.onClick.AddListener(() => { confirmation.SetActive(false); Render(); });
-            session.LobbyChanged += Render; session.StateChanged += ConnectionChanged; session.GameEvent += Event;
+            if (sendButton != null) sendButton.onClick.AddListener(SendChat);
+            if (chatInput != null)
+            {
+                chatInput.richText = false;
+                if (chatInput.textComponent != null)
+                {
+                    chatInput.textComponent.richText = false;
+                }
+                chatInput.onSubmit.AddListener(_ => SendChat());
+            }
+            session.LobbyChanged += Render; session.StateChanged += ConnectionChanged; session.GameEvent += Event; session.ChatReceived += OnChatReceived;
             ConnectionChanged(session.State);
         }
         private void ConnectionChanged(ConnectionState state)
@@ -98,6 +112,63 @@ namespace Ludo.Controllers
             moveButton.interactable = CanMove && selected != null;
             leaveButton.interactable = Connected && !busy && !navigating;
             confirmButton.interactable = Connected && !busy; cancelButton.interactable = !busy;
+            if (sendButton != null) sendButton.interactable = Connected && !busy;
+            if (chatInput != null) chatInput.interactable = Connected;
+        }
+
+        public void SendChat()
+        {
+            if (chatInput == null || string.IsNullOrWhiteSpace(chatInput.text) || !Connected || busy) return;
+            string text = chatInput.text.Trim();
+            // Xóa các thẻ underline do bộ gõ tiếng Việt (IME) chèn vào nếu có
+            text = text.Replace("<u>", "").Replace("</u>", "").Trim();
+            if (string.IsNullOrWhiteSpace(text)) return;
+            chatInput.text = "";
+            chatInput.ActivateInputField();
+            _ = ExecuteChat(text);
+        }
+
+        private async Task ExecuteChat(string text)
+        {
+            try
+            {
+                await session.SendChatMessageAsync(text);
+            }
+            catch (Exception)
+            {
+                if (this != null && feedback != null) feedback.text = "Không thể gửi tin nhắn. Vui lòng thử lại.";
+            }
+        }
+
+        private void OnChatReceived(JObject data)
+        {
+            if (data == null) return;
+            string senderName = (string)data["senderDisplayName"] ?? "Người chơi";
+            string color = (string)data["senderColor"] ?? "RED";
+            string colorHex = color switch
+            {
+                "RED" => "#E03E3E",
+                "BLUE" => "#2E7BD6",
+                "YELLOW" => "#D69E2E",
+                "GREEN" => "#2EA85C",
+                _ => "#7C58D2"
+            };
+            string colorLabel = color switch
+            {
+                "RED" => "Đỏ",
+                "BLUE" => "Xanh",
+                "YELLOW" => "Vàng",
+                "GREEN" => "Lá",
+                _ => ""
+            };
+            string tag = string.IsNullOrEmpty(colorLabel) ? "" : $"[{colorLabel}] ";
+            string msg = (string)data["message"] ?? "";
+            // Thoát ký tự '<' để tránh làm hỏng định dạng rich text trong chatLog
+            msg = msg.Replace("<", "<\u200B");
+            string line = $"<color={colorHex}><b>{tag}{senderName}:</b></color> {msg}";
+            chatLines.Add(line);
+            if (chatLines.Count > 30) chatLines.RemoveAt(0);
+            if (chatLog != null) chatLog.text = string.Join("\n", chatLines);
         }
         private void Event(string type, JObject data)
         {
@@ -145,6 +216,14 @@ namespace Ludo.Controllers
         }
         private void Go(string scene) { if (navigating) return; navigating = true; SceneManager.LoadScene(scene); }
         private void OnDestroy()
-        { if (session != null) { session.LobbyChanged -= Render; session.StateChanged -= ConnectionChanged; session.GameEvent -= Event; } }
+        {
+            if (session != null)
+            {
+                session.LobbyChanged -= Render;
+                session.StateChanged -= ConnectionChanged;
+                session.GameEvent -= Event;
+                session.ChatReceived -= OnChatReceived;
+            }
+        }
     }
 }
