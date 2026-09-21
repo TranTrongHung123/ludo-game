@@ -1,0 +1,43 @@
+
+[mcp_servers.unity]
+command = "C:\\Users\\Acer\\AppData\\Local\\Unity\\bin\\unity.exe"
+args = ["mcp","--project-path","D:\\Projects\\ludo-game\\client-unity"]
+
+[mcp_servers.unity.tools.editor_status]
+approval_mode = "approve"
+
+[mcp_servers.unity.tools.eval]
+approval_mode = "approve"
+
+[mcp_servers.unity.tools.recompile]
+approval_mode = "approve"
+
+[mcp_servers.unity.tools.recompile_status]
+approval_mode = "approve"
+
+[mcp_servers.unity.tools.run_script]
+approval_mode = "approve"
+
+[mcp_servers.unity.tools.screenshot]
+approval_mode = "approve"
+
+[mcp_servers.unity.tools.console]
+approval_mode = "approve"
+
+[mcp_servers.unity.tools.editor_play]
+approval_mode = "approve"
+
+[mcp_servers.unity.tools.editor_stop]
+approval_mode = "approve"
+
+[sandbox_workspace_write]
+network_access = true
+
+[features.network_proxy]
+enabled = true
+allow_local_binding = false
+
+[features.network_proxy.domains]
+localhost = "allow"
+"127.0.0.1" = "allow"
+"::1" = "allow"
