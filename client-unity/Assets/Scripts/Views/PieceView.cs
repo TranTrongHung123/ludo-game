@@ -10,13 +10,15 @@ namespace Ludo.Views
         [SerializeField] private UnityEngine.UI.Button button;
         [SerializeField] private UnityEngine.UI.Image body, halo;
         [SerializeField] private TMP_Text number, effect;
+        [SerializeField] private HorseGraphic horse;
         private Coroutine motion;
         private int previousStep = -2;
         private RectTransform Rect => (RectTransform)transform;
         public void Bind(string id, int slot, int index, int step, bool shield, bool slow, bool legal, bool selected, System.Action<string> select, bool animate)
         {
-            body.color = BoardGeometry.Tints[slot];
-            number.text = (index + 1).ToString();
+            body.color = Color.clear;
+            horse.color = BoardGeometry.Tints[slot];
+            number.gameObject.SetActive(false);
             effect.text = shield ? "K" : slow ? "−2" : step == 53 ? "V" : "";
             effect.gameObject.SetActive(shield || slow || step == 53);
             halo.gameObject.SetActive(legal || selected);

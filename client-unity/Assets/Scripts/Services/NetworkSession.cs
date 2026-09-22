@@ -23,6 +23,22 @@ namespace Ludo.Services
         public string AuthUsername { get; set; } = "";
         public string AuthNotice { get; set; } = "";
         public event Action<ConnectionState> StateChanged;
+        public string ServerHost => serverHost;
+        public int ServerPort => serverPort;
+
+        public Task ChangeServerAsync(string host, int port)
+        {
+            if (SessionId != null || State == ConnectionState.Connecting)
+                throw new InvalidOperationException("Cannot change server during an active session or connection attempt.");
+            if (string.IsNullOrWhiteSpace(host) || Uri.CheckHostName(host.Trim()) == UriHostNameType.Unknown || port < 1 || port > 65535)
+                throw new ArgumentException("Invalid server endpoint.");
+            var previous = client;
+            client = null; // Ignore queued events from the old connection.
+            previous?.Dispose();
+            serverHost = host.Trim(); serverPort = port;
+            SetState(ConnectionState.Disconnected);
+            return ConnectAsync();
+        }
 
         private void Awake()
         {
@@ -68,11 +84,7 @@ namespace Ludo.Services
                     var response = await attempt.RequestAsync("RECONNECT", new JObject { ["sessionId"] = SessionId }, null, "RECONNECT_RESULT");
                     if ((bool?)response["success"] != true || (bool?)response["data"]?["restored"] != true)
                     { ClearAuthentication(); attempt.Dispose(); AuthNotice = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."; SetState(ConnectionState.Disconnected); return; }
-                    Room = response["data"]?["room"] as JObject;
-                    if ((string)GameState?["matchId"] != (string)response["data"]?["gameState"]?["matchId"]) GameOver = null;
-                    LastDice = null;
-                    GameState = response["data"]?["gameState"] as JObject;
-                    Invitation = null;
+                    RestoreSnapshot(response["data"] as JObject);
                 }
                 if (!disposed && client == attempt)
                     SetState(attempt.IsConnected ? ConnectionState.Connected : ConnectionState.Disconnected);
@@ -117,6 +129,22 @@ namespace Ludo.Services
         }
 
         private void SetState(ConnectionState state) { State = state; StateChanged?.Invoke(state); }
+
+        private void RestoreSnapshot(JObject data)
+        {
+            ApplyRoom(data?["room"] as JObject);
+            var snapshot = data?["gameState"] as JObject;
+            if ((string)GameState?["matchId"] != (string)snapshot?["matchId"]) GameOver = null;
+            LastDice = null;
+            GameState = snapshot;
+            SyncParticipantPresence();
+            var result = data?["gameOver"] as JObject;
+            if (result != null && GameState != null &&
+                (string)result["matchId"] == (string)GameState["matchId"] &&
+                (string)result["roomId"] == (string)GameState["roomId"])
+                GameOver = result;
+            Invitation = null;
+        }
         private void OnDestroy()
         {
             if (Instance != this) return;

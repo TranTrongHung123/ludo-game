@@ -14,10 +14,12 @@ namespace Ludo.Controllers
         [SerializeField] private TMP_Text headline, matchId, connection, feedback, count, lobbyLabel;
         [SerializeField] private UnityEngine.UI.Image connectionDot;
         [SerializeField] private UnityEngine.UI.Button lobbyButton;
+        [SerializeField] private UnityEngine.UI.Button rematchButton;
+        [SerializeField] private TMP_Text rematchLabel;
         [SerializeField] private ResultRowView[] rows;
         [SerializeField] private GameObject emptyState;
         private NetworkSession session;
-        private bool leaving, navigating;
+        private bool leaving, replaying, navigating;
 
         private void Start()
         {
@@ -25,8 +27,10 @@ namespace Ludo.Controllers
             if (session?.SessionId == null) { Go("LoginScene"); return; }
             if (session.GameOver == null) { Go(session.GameState != null ? "GameScene" : session.Room != null ? "RoomScene" : "LobbyScene"); return; }
             lobbyButton.onClick.AddListener(ReturnToLobby);
+            if (rematchButton != null) rematchButton.onClick.AddListener(PlayAgain);
             session.StateChanged += ConnectionChanged;
             session.GameEvent += GameEvent;
+            session.LobbyChanged += RoomChanged;
             Render();
             ConnectionChanged(session.State);
         }
@@ -46,22 +50,33 @@ namespace Ludo.Controllers
         }
 
         private void GameEvent(string type, JObject data) { if (type == "GAME_OVER" && !navigating) Render(); }
+        private void RoomChanged()
+        {
+            if (navigating) return;
+            if (session.Room != null && (string)session.Room["state"] == "WAITING") Go("RoomScene");
+            else if (session.GameState != null && (string)session.GameState["roomState"] == "PLAYING") Go("GameScene");
+        }
         private void ConnectionChanged(ConnectionState state)
         {
             if (session.SessionId == null) { Go("LoginScene"); return; }
+            RoomChanged();
+            if (navigating) return;
             connection.text = state == ConnectionState.Connected ? "Kết quả đã đồng bộ với Server" : state == ConnectionState.Connecting ? "Đang khôi phục kết nối..." : "Mất kết nối • Đang thử lại";
             connectionDot.color = state == ConnectionState.Connected ? new Color32(47,160,119,255) : new Color32(197,137,68,255);
             RefreshAction();
         }
         private void RefreshAction()
         {
-            lobbyButton.interactable = !leaving && !navigating && session.State == ConnectionState.Connected;
+            bool available = !leaving && !replaying && !navigating && session.State == ConnectionState.Connected;
+            lobbyButton.interactable = available;
+            if (rematchButton != null) rematchButton.interactable = available && session.Room != null;
+            if (rematchLabel != null) rematchLabel.text = replaying ? "Đang chuẩn bị..." : "Chơi tiếp";
             lobbyLabel.text = leaving ? "Đang về sảnh..." : "Về sảnh";
         }
 
         public async void ReturnToLobby()
         {
-            if (leaving || navigating || session?.State != ConnectionState.Connected) return;
+            if (leaving || replaying || navigating || session?.State != ConnectionState.Connected) return;
             if (session.Room == null) { Go("LobbyScene"); return; }
             leaving = true; RefreshAction(); feedback.text = "Đang rời phòng và trở về sảnh...";
             try
@@ -77,11 +92,28 @@ namespace Ludo.Controllers
             finally { if (this != null && !navigating) { leaving = false; RefreshAction(); } }
         }
 
+        public async void PlayAgain()
+        {
+            if (leaving || replaying || navigating || session?.State != ConnectionState.Connected || session.Room == null) return;
+            replaying = true; RefreshAction(); feedback.text = "Đang chuẩn bị ván mới...";
+            try
+            {
+                await session.SetReadyAsync(true);
+                if (this != null) Go("RoomScene");
+            }
+            catch (Exception)
+            {
+                if (this != null && !navigating) feedback.text = "Chưa thể chơi tiếp. Vui lòng thử lại khi kết nối ổn định.";
+            }
+            finally { if (this != null && !navigating) { replaying = false; RefreshAction(); } }
+        }
+
         private void Go(string scene) { if (navigating) return; navigating = true; SceneManager.LoadScene(scene); }
         private void OnDestroy()
         {
-            if (session != null) { session.StateChanged -= ConnectionChanged; session.GameEvent -= GameEvent; }
-            lobbyButton.onClick.RemoveListener(ReturnToLobby);
+            if (session != null) { session.StateChanged -= ConnectionChanged; session.GameEvent -= GameEvent; session.LobbyChanged -= RoomChanged; }
+            if (lobbyButton != null) lobbyButton.onClick.RemoveListener(ReturnToLobby);
+            if (rematchButton != null) rematchButton.onClick.RemoveListener(PlayAgain);
         }
     }
 }

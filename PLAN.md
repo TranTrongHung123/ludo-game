@@ -208,28 +208,28 @@
 
 ---
 
-# Phase 13 - JavaFX Client
+# Phase 13 - Unity Client (client chính)
 
-- [x] JavaFX bootstrap
-- [x] FXML loading
-- [x] CSS foundation
-- [x] Login Screen
-- [x] Register Screen
-- [x] Lobby Screen
-- [x] Room Screen
-- [x] Game Board Screen
-- [x] Ranking Screen
-- [x] Match History Screen
-- [x] Game Result Screen
-- [x] Render 48 ring cells
-- [x] Render Finish Track
-- [x] Render Pieces
-- [x] Highlight valid moves
-- [x] Render Dice
-- [x] Render Turn Indicator
-- [x] Render Countdown
-- [x] Render Special Cells
-- [x] Network thread không block JavaFX Application Thread
+> Các mục hoàn thành dưới đây phản ánh code/scene đã có. Chưa xác nhận toàn bộ
+> luồng end-to-end Unity + Java + MySQL. JavaFX trong `client/` là legacy.
+
+- [x] Unity project, C#, uGUI/Canvas và TextMeshPro
+- [x] TCP framing, requestId, heartbeat và session xuyên scene
+- [x] Login / Register / Lobby / Room
+- [x] Game / Result / Ranking / History
+- [x] Render 48 ô, Finish Track, quân, ô đặc biệt từ Server
+- [x] Highlight validPieceIds, dice, lượt và countdown authoritative
+- [x] Network I/O bất đồng bộ; dispatch event qua Unity main thread
+- [x] Chat GameScene qua CHAT_MESSAGE
+- [x] Reconnect với room/game snapshot
+- [x] Khôi phục GAME_OVER đã bỏ lỡ qua RECONNECT_RESULT.gameOver
+- [x] Nhận presence từ ROOM_UPDATED dù gameplay stateVersion không đổi
+- [x] Làm mới điểm/số lần hạng nhất trên profile và header Lobby
+- [x] Escape tên người gửi chat trước khi đưa vào rich text
+- [x] Chơi ván mới trong cùng phòng theo mục 32 AGENTS.md (Server + Unity TCP fixture đã test)
+- [ ] Chạy đủ luồng Unity–Java–MySQL và tự động hóa test Unity trên CI
+
+Chi tiết, bằng chứng và giới hạn kiểm tra: [INTEGRATION_REVIEW.md](INTEGRATION_REVIEW.md).
 
 ---
 
@@ -251,6 +251,10 @@
 ---
 
 # Phase 15 - Integration Testing
+
+> Checklist lịch sử của bộ test Java; không đại diện cho test end-to-end Unity.
+> Sau sửa lỗi 2026-09-22: Maven verify đạt 117 test, 4 MySQL test skip;
+> Unity đạt 23 regression check và 61 Game/Result TCP fixture check.
 
 - [x] Full match 2 players
 - [x] Full match 3 players
@@ -313,5 +317,5 @@ Một task lớn được đánh `[x]` khi phạm vi triển khai local đáp �
 Hiện tại ưu tiên:
 
 1. Duy trì Maven `verify` và MySQL integration test xanh trên CI.
-2. Rà soát thủ công luồng UI nhiều Client trước demo.
+2. Kiểm thử các sửa lỗi trong `INTEGRATION_REVIEW.md` bằng nhiều Unity Client với Java/MySQL trước demo.
 3. Phase 14 và Phase 16 được thực hiện theo kế hoạch riêng khi nhóm ưu tiên.

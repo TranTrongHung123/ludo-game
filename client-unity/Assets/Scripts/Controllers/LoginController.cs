@@ -12,6 +12,7 @@ namespace Ludo.Controllers
     {
         [SerializeField] private TMP_InputField usernameField;
         [SerializeField] private TMP_InputField passwordField;
+        [SerializeField] private TMP_InputField serverHostField, serverPortField;
         [SerializeField] private UnityEngine.UI.Button loginButton;
         [SerializeField] private UnityEngine.UI.Button registerButton;
         [SerializeField] private UnityEngine.UI.Button visibilityButton;
@@ -39,6 +40,8 @@ namespace Ludo.Controllers
             session.StateChanged += RenderConnection;
             RenderConnection(session.State);
             usernameField.text = session.AuthUsername;
+            serverHostField.text = session.ServerHost;
+            serverPortField.text = session.ServerPort.ToString();
             if (!string.IsNullOrEmpty(session.AuthNotice))
             {
                 Feedback(session.AuthNotice, false);
@@ -52,7 +55,9 @@ namespace Ludo.Controllers
         {
             if (pending || Keyboard.current == null || !Keyboard.current.tabKey.wasPressedThisFrame) return;
             if (usernameField.isFocused) passwordField.ActivateInputField();
-            else if (passwordField.isFocused) usernameField.ActivateInputField();
+            else if (passwordField.isFocused) serverHostField.ActivateInputField();
+            else if (serverHostField.isFocused) serverPortField.ActivateInputField();
+            else if (serverPortField.isFocused) usernameField.ActivateInputField();
         }
 
         public static string Validate(string username, string password)
@@ -70,12 +75,19 @@ namespace Ludo.Controllers
             if (pending || session == null || session.SessionId != null) return;
             string error = Validate(usernameField.text, passwordField.text);
             if (error != null) { Feedback(error, true); return; }
+            string host = serverHostField.text.Trim();
+            if (Uri.CheckHostName(host) == UriHostNameType.Unknown || !int.TryParse(serverPortField.text, out int port) || port < 1 || port > 65535)
+            { Feedback("Nhập IP/tên máy chủ hợp lệ và port từ 1 đến 65535.", true); return; }
             if (session.State != ConnectionState.Connected) { Feedback("Vui lòng kết nối Game Server trước.", true); return; }
             pending = true;
             RefreshControls();
             Feedback("Đang đăng nhập...", false);
             try
             {
+                if (host != session.ServerHost || port != session.ServerPort)
+                    await session.ChangeServerAsync(host, port);
+                if (this == null) return;
+                if (session.State != ConnectionState.Connected) { Feedback("Không kết nối được máy chủ đã chọn.", true); return; }
                 var result = await session.LoginAsync(usernameField.text, passwordField.text);
                 if (this == null) return;
                 passwordField.text = "";
@@ -128,14 +140,22 @@ namespace Ludo.Controllers
             else Feedback("Màn hình đăng ký sẽ được bổ sung ở bước tiếp theo.", false);
         }
 
-        private async void Retry() { if (session != null) await session.ConnectAsync(); }
+        private async void Retry()
+        {
+            if (session == null || pending || session.State == ConnectionState.Connecting) return;
+            string host = serverHostField.text.Trim();
+            if (Uri.CheckHostName(host) == UriHostNameType.Unknown || !int.TryParse(serverPortField.text, out int port) || port < 1 || port > 65535)
+            { Feedback("Nhập IP/tên máy chủ hợp lệ và port từ 1 đến 65535.", true); return; }
+            await session.ChangeServerAsync(host, port);
+        }
         private void RenderConnection(ConnectionState state)
         {
             connectionLabel.text = state == ConnectionState.Connected ? "Đã kết nối Game Server" :
                 state == ConnectionState.Connecting ? "Đang kết nối..." : "Mất kết nối Game Server";
             connectionDot.color = state == ConnectionState.Connected ? new Color32(47, 164, 119, 255) :
                 state == ConnectionState.Connecting ? new Color32(214, 158, 54, 255) : new Color32(211, 88, 106, 255);
-            retryButton.gameObject.SetActive(state == ConnectionState.Disconnected);
+            retryButton.gameObject.SetActive(true);
+            retryButton.interactable = !pending && state != ConnectionState.Connecting;
             RefreshControls();
         }
 
@@ -146,6 +166,8 @@ namespace Ludo.Controllers
             loginLabel.text = pending ? "Đang đăng nhập..." : authenticated ? "Đã đăng nhập" : "Đăng nhập";
             usernameField.interactable = passwordField.interactable = !pending && !authenticated;
             registerButton.interactable = visibilityButton.interactable = !pending && !authenticated;
+            serverHostField.interactable = serverPortField.interactable = !pending && !authenticated && session.State != ConnectionState.Connecting;
+            retryButton.interactable = !pending && !authenticated && session.State != ConnectionState.Connecting;
         }
 
         private void Feedback(string message, bool error)

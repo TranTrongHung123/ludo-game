@@ -56,8 +56,8 @@ namespace Ludo.Controllers
                 for (int i = entries.Count; i < renderedRows.Count; i++) renderedRows[i].gameObject.SetActive(false);
                 empty.text = "Chưa có người chơi trong bảng xếp hạng.";
                 empty.gameObject.SetActive(entries.Count == 0);
-                count.text = entries.Count + " người chơi";
-                feedback.text = "Đã cập nhật bảng xếp hạng.";
+                count.text = "";
+                feedback.text = "";
                 Canvas.ForceUpdateCanvases(); scroll.StopMovement(); scroll.verticalNormalizedPosition = 1;
             }
             catch (Exception)

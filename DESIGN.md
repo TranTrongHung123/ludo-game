@@ -1,9 +1,10 @@
 # DESIGN.md — ĐẶC TẢ THIẾT KẾ UNITY CLIENT
 
 > Dự án: **Ludo Game / Cờ Cá Ngựa Online**  
-> Client mới: **Unity 6.3 LTS, 2D, C#**  
+> Client chính: **Unity 6, 2D, C#**; phiên bản Editor theo `client-unity/ProjectSettings/ProjectVersion.txt` (hiện tại `6000.6.2f1`).
 > Server giữ nguyên: **Java 21 + TCP Socket + JSON + MySQL**  
-> Mục tiêu: chuyển toàn bộ giao diện và luồng tương tác từ JavaFX cũ sang Unity, đồng thời giữ nguyên protocol và hành vi Server hiện có.
+> Mục tiêu: phát triển client Unity chính thức, giữ protocol và luật Server. JavaFX cũ chỉ là nguồn tham khảo migration.
+> Trạng thái triển khai và lỗi tích hợp còn mở: [INTEGRATION_REVIEW.md](INTEGRATION_REVIEW.md). Tài liệu thiết kế không phải biên bản xác nhận mọi chức năng đã đạt.
 
 ---
 
@@ -484,7 +485,7 @@ Cuối panel:
 
 ## 10.4 Nút xử lý sự kiện
 
-Giữ đúng:
+Hai thao tác sau đợt sửa tích hợp ngày 2026-09-22:
 
 - `Rời phòng`;
 - `Mời`;
@@ -738,10 +739,13 @@ Tất cả lấy Server:
 Giữ đúng:
 
 ```text
-Về sảnh
+Chơi tiếp       Về sảnh
 ```
 
-Không thêm.
+`Chơi tiếp` gửi READY để Server mở lại phòng sau khi đã lưu kết quả; chuyển về
+RoomScene khi Server xác nhận/broadcast WAITING. Vẫn cần mọi người Ready và chủ
+phòng Start. `Về sảnh` gửi LEAVE_ROOM. Khóa cả hai nút trong lúc một request đang
+chờ hoặc khi offline, không tự reset trạng thái trận tại client.
 
 ---
 

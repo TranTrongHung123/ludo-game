@@ -1,12 +1,13 @@
 # Ludo Game - Bài tập lớn Lập trình mạng
 
-Game **Cờ Cá Ngựa (Ludo)** nhiều người chơi được xây dựng bằng Java theo mô hình **Client–Server**.
+Game **Cờ Cá Ngựa (Ludo)** nhiều người chơi dùng **Unity C# Client + Java Server**, theo mô hình **Client–Server**.
 
 ## Công nghệ
 
 - Java 21
 - Maven multi-module
-- JavaFX + FXML
+- Unity 6 + C#, uGUI / Canvas + TextMeshPro
+- Newtonsoft.Json phía Unity
 - TCP Socket
 - JSON / Jackson
 - MySQL 8
@@ -18,7 +19,7 @@ Game **Cờ Cá Ngựa (Ludo)** nhiều người chơi được xây dựng bằ
 ## Kiến trúc
 
 ```text
-JavaFX Client
+Unity C# Client
       |
       | TCP + Length-Prefixed UTF-8 JSON
       v
@@ -47,12 +48,13 @@ ludo-game/
 ├── pom.xml
 ├── common/
 ├── server/
-└── client/
+├── client-unity/    # Client chính
+└── client/          # JavaFX legacy
 ```
 
 ### `common`
 
-Chứa code dùng chung giữa Client và Server:
+Định nghĩa contract phía Java. Unity ánh xạ JSON tương ứng bằng C#; không import JAR:
 
 - DTO
 - Protocol
@@ -76,16 +78,19 @@ Chứa:
 - Ranking
 - Timeout / Reconnect
 
-### `client`
+### `client-unity` — client chính
 
-Chứa:
+Unity project có scenes, prefabs, uGUI/TextMeshPro và C# scripts:
 
-- JavaFX
-- FXML
-- Controller
-- Network Client
-- Client State
-- UI Service
+- `Network/`: TCP, framing, heartbeat, request/response.
+- `Services/`: session, lobby, room, game, ranking, history.
+- `Controllers/` và `Views/`: tương tác và render dữ liệu Server.
+- `AgentScripts/`: kiểm tra/authoring, không đưa vào player build.
+
+### `client` — legacy
+
+Client JavaFX cũ được giữ để tham khảo và chạy test cũ. Module vẫn nằm trong
+Maven reactor; không phải client dùng cho hướng dẫn demo hiện tại.
 
 ## Quy mô game
 
@@ -112,9 +117,10 @@ Chi tiết đầy đủ xem [`AGENTS.md`](./AGENTS.md).
 
 Hướng dẫn chạy ngắn bằng PowerShell xem tại [`RUN.md`](./RUN.md).
 
-Project sử dụng Maven multi-module.
+Backend sử dụng Maven multi-module; Unity build riêng bằng Editor.
+Để build backend: `.\mvnw.cmd -pl server -am install`.
 
-Build toàn bộ project bằng Maven Wrapper (không cần cài Maven riêng):
+Build toàn bộ module Java (bao gồm client legacy) bằng Maven Wrapper (không cần cài Maven riêng):
 
 ```powershell
 .\mvnw.cmd install
@@ -153,7 +159,9 @@ CI thực hiện:
 - cài Eclipse Temurin JDK 21 và cache Maven dependencies;
 - khởi tạo MySQL 8.4 service có health check;
 - bật toàn bộ MySQL integration test;
-- chạy `./mvnw --batch-mode --no-transfer-progress verify` cho cả `common`, `server` và `client`.
+- chạy `./mvnw --batch-mode --no-transfer-progress verify` cho `common`, `server` và `client` legacy.
+
+CI hiện chưa build/test Unity; Maven xanh không chứng minh luồng Unity–Java đã đạt end-to-end.
 
 Các mật khẩu trong workflow chỉ là credential tạm thời của MySQL service trong runner, không dùng GitHub secret và không dùng cho môi trường triển khai.
 
@@ -228,7 +236,7 @@ Server hiện hỗ trợ end-to-end:
 - `MOVE_PIECE` authoritative với spawn, chặn quân cùng màu, capture/Shield, Finish Track và carry-over;
 - layout cố định 20 ô đặc biệt và xử lý đầy đủ Speed, Slow, Lucky, Trap, Shield mà không chain effect;
 - bonus roll khi ra 6 hoặc gặp Lucky, turn rotation theo slot, hoàn thành quân/người chơi và xếp hạng trong RAM;
-- `TimeoutManager` authoritative cho phase Roll 8 giây và Move 12 giây, chống callback cũ đổi lượt hai lần bằng `stateVersion`;
+- `TimeoutManager` authoritative cho phase Roll 120 giây và Move 120 giây, chống callback cũ đổi lượt hai lần bằng `stateVersion`;
 - broadcast `TURN_TIMEOUT` và Game State mới; người chơi `DISCONNECTED + ACTIVE` vẫn nhận lượt và timeout bình thường.
 - hết reconnect grace period 60 giây sẽ chuyển participant sang `FORFEITED`, gán hạng thấp nhất còn trống, đưa quân khỏi bàn và kiểm tra cascading Game Over;
 - broadcast `GAME_OVER` với bảng hạng authoritative khi forfeit làm trận kết thúc.
@@ -241,41 +249,36 @@ Server hiện hỗ trợ end-to-end:
 
 Không log plain-text password, password hash hay session token.
 
-## Chạy JavaFX Client
+## Chạy Unity Client
 
-Khởi động MySQL và Game Server trước. Sau đó mở terminal khác tại thư mục gốc dự án:
+1. Khởi động MySQL và Java Game Server.
+2. Mở thư mục `client-unity/` bằng Unity Hub, dùng phiên bản trong
+   `ProjectSettings/ProjectVersion.txt` (hiện tại **6000.6.2f1**).
+3. Mở `Assets/Scenes/LoginScene.unity` rồi nhấn **Play**.
+4. Đăng ký/đăng nhập, tạo hoặc vào phòng; mọi thành viên Ready rồi chủ phòng Start.
 
-```powershell
-.\mvnw.cmd -pl client javafx:run
-```
+Client mặc định kết nối `127.0.0.1:5555`. Đổi `Server Host` / `Server Port` trên
+`NetworkSession`, hoặc đặt `SERVER_HOST` / `SERVER_PORT` trước khi mở Editor/player.
+Chạy nhiều client bằng bản desktop build của Unity; chi tiết trong [RUN.md](RUN.md).
 
-Client mặc định kết nối tới `127.0.0.1:5555`. Có thể cấu hình `SERVER_HOST` và `SERVER_PORT` trong run environment của IDE hoặc terminal. Trong IntelliJ IDEA cũng có thể chạy trực tiếp `main` của [ClientApplication.java](./client/src/main/java/vn/ptit/ltm/client/ClientApplication.java).
+Các màn đã có: Login, Register, Lobby, Room, Game, Result, Ranking, History.
+Unity gửi ý định qua TCP, giữ session trong RAM xuyên scene, tự trả heartbeat,
+render board 48 ô và `validPieceIds` từ Server, gửi/nhận chat trong GameScene,
+tải xếp hạng/lịch sử và thử reconnect khi mất kết nối.
 
-Client hiện hỗ trợ:
+Chi tiết scene, prefab và script kiểm tra: [client-unity/README.md](client-unity/README.md).
 
-- màn hình Register và Login bằng JavaFX/FXML;
-- gửi `REGISTER`, `LOGIN`, `LOGOUT` qua TCP length-prefixed JSON;
-- ghép request/response bằng `requestId` và hiển thị lỗi nghiệp vụ thân thiện;
-- giữ session/profile trong RAM sau khi đăng nhập;
-- tự phản hồi heartbeat `PING` bằng `PONG`;
-- Lobby Screen nhận cả snapshot ban đầu và event `ONLINE_PLAYERS_UPDATED`;
-- tạo phòng, nhập mã để tham gia, xem thành viên/slot/màu và rời phòng;
-- gửi/nhận lời mời phòng, Accept/Reject và hiển thị thời điểm hết hạn;
-- Ready/Unready, Start Game và chuyển sang màn hình trạng thái trận ban đầu;
-- nhận event `ROOM_UPDATED`, `INVITE_PLAYER`, `GAME_STATE` không có `requestId` và cập nhật state trước khi render;
-- đổ xúc xắc, chọn quân hợp lệ và gửi Move Piece từ màn hình trận;
-- render bàn cờ JavaFX gồm 48 ô vòng chung, 6 nấc Finish Track cho mỗi màu, khu vực chuồng và toàn bộ quân từ `GameState` authoritative;
-- render đúng danh sách Special Cells Server gửi, hiển thị trạng thái Slow/Shield và highlight quân thuộc `validPieceIds`; click quân chỉ chọn `pieceId`, không tự tính nước đi ở Client;
-- render dice, phase, countdown theo deadline Server, lượt hiện tại và vị trí `stepCount` mới nhất từ Game State;
-- nhận `TURN_TIMEOUT`, khóa thao tác khi deadline đã hết và hiển thị phản hồi timeout;
-- tự thử nối lại trong grace period, gửi `RECONNECT` bằng session cũ và chỉ mở lại thao tác sau khi đã nhận full Room/Game State cùng deadline authoritative;
-- nhận `GAME_OVER` và tự chuyển sang Game Result Screen riêng, hiển thị thứ hạng, màu quân, điểm nhận, tổng điểm và người `FORFEITED` với 0 điểm;
-- nút `Bỏ cuộc` yêu cầu xác nhận rõ hậu quả trước khi gửi `LEAVE_ROOM`; Game Result Screen có nút `Về sảnh` và chỉ dọn Room/Game State cục bộ sau khi Server xác nhận;
-- có Ranking Screen và Match History Screen tải bất đồng bộ dữ liệu authoritative từ Server, hỗ trợ làm mới và quay lại Lobby;
-- tự làm mới điểm và số lần hạng nhất trong profile cục bộ từ snapshot Lobby do Server broadcast;
-- toàn bộ connect, send, receive và timeout chạy ngoài JavaFX Application Thread.
+## Kết quả rà soát tích hợp — 2026-09-22
 
-Test suite còn mô phỏng trọn ván 2/3/4 người từ lúc toàn bộ quân ở chuồng tới cascading Game Over, đồng thời kiểm tra TCP invalid/oversized/malformed/partial frame, duplicate request, wrong-turn, timeout, disconnect/reconnect và tính toàn vẹn ranking/lịch sử.
+Đã sửa 5 vấn đề: khôi phục kết quả bỏ lỡ bằng `RECONNECT_RESULT.gameOver`, đồng bộ
+presence, điểm Lobby, escape tên chat và chơi lại cùng phòng qua nút **Chơi tiếp**.
+Chi tiết thay đổi và giới hạn: [INTEGRATION_REVIEW.md](INTEGRATION_REVIEW.md).
+
+- Maven `verify`: 117 test đạt (95 common/server + 22 client legacy), 4 MySQL test skip.
+- Unity: 23 kiểm tra hồi quy và 61 kiểm tra Game/Result qua TCP fixture đạt.
+- Chơi tiếp giữ roomId, reset ready/trận cũ sau khi lưu kết quả; host vẫn phải chờ
+  tất cả thành viên Ready trước khi Start.
+- Chưa chạy end-to-end với Unity + Java + MySQL thật trong đợt này.
 
 ## Workflow phát triển
 
@@ -314,6 +317,8 @@ Jira Task
 - [`AGENTS.md`](./AGENTS.md): đặc tả kỹ thuật và luật dành cho developer / AI coding agent.
 - [`PLAN.md`](./PLAN.md): checklist tiến độ kỹ thuật toàn dự án.
 - [`README.md`](./README.md): giới thiệu nhanh repository, kiến trúc và cách làm việc.
+- [`DESIGN.md`](./DESIGN.md): thiết kế giao diện Unity.
+- [`INTEGRATION_REVIEW.md`](./INTEGRATION_REVIEW.md): bằng chứng rà soát Java–Unity và các lỗi còn mở.
 - [`RUN.md`](./RUN.md): các lệnh ngắn để chạy database, Server, Client và test.
 
 ## Thành viên

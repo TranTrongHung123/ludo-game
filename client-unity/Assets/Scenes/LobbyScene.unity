@@ -1109,6 +1109,10 @@ PrefabInstance:
     m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: 279786431621322630, guid: c31fc74b1e745474e9256d9da46fe52c, type: 3}
+      propertyPath: m_TextWrappingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 279786431621322630, guid: c31fc74b1e745474e9256d9da46fe52c, type: 3}
       propertyPath: m_fontColor32.rgba
       value: 4282656294
       objectReference: {fileID: 0}

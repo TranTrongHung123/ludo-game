@@ -22,6 +22,7 @@ namespace Ludo.Controllers
         [SerializeField] private TMP_InputField chatInput;
         [SerializeField] private UnityEngine.UI.Button sendButton;
         [SerializeField] private TMP_Text chatLog;
+        [SerializeField] private UnityEngine.UI.ScrollRect chatScroll;
         private readonly System.Collections.Generic.List<string> chatLines = new System.Collections.Generic.List<string>();
         private NetworkSession session;
         private bool busy, navigating, snap = true;
@@ -71,7 +72,12 @@ namespace Ludo.Controllers
         }
         private void Render()
         {
-            if (navigating || Game == null) return;
+            if (navigating) return;
+            if (Game == null)
+            {
+                if (session?.Room != null && (string)session.Room["state"] == "WAITING") Go("RoomScene");
+                return;
+            }
             if (session.GameOver != null && Application.CanStreamedLevelBeLoaded("ResultScene")) { Go("ResultScene"); return; }
             if (awaitingStateVersion != null && (long?)Game["stateVersion"] > awaitingStateVersion) awaitingStateVersion = null;
             roomLabel.text = "PHÒNG  " + (string)Game["roomId"];
@@ -143,7 +149,7 @@ namespace Ludo.Controllers
         private void OnChatReceived(JObject data)
         {
             if (data == null) return;
-            string senderName = (string)data["senderDisplayName"] ?? "Người chơi";
+            string senderName = EscapeChatText((string)data["senderDisplayName"] ?? "Người chơi");
             string color = (string)data["senderColor"] ?? "RED";
             string colorHex = color switch
             {
@@ -164,12 +170,20 @@ namespace Ludo.Controllers
             string tag = string.IsNullOrEmpty(colorLabel) ? "" : $"[{colorLabel}] ";
             string msg = (string)data["message"] ?? "";
             // Thoát ký tự '<' để tránh làm hỏng định dạng rich text trong chatLog
-            msg = msg.Replace("<", "<\u200B");
+            msg = EscapeChatText(msg);
             string line = $"<color={colorHex}><b>{tag}{senderName}:</b></color> {msg}";
             chatLines.Add(line);
-            if (chatLines.Count > 30) chatLines.RemoveAt(0);
-            if (chatLog != null) chatLog.text = string.Join("\n", chatLines);
+            if (chatLines.Count > 200) chatLines.RemoveAt(0);
+            if (chatLog != null)
+            {
+                chatLog.text = string.Join("\n", chatLines);
+                Canvas.ForceUpdateCanvases();
+                UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(chatScroll.content);
+                chatScroll.StopMovement();
+                chatScroll.verticalNormalizedPosition = 0;
+            }
         }
+        public static string EscapeChatText(string text) => (text ?? "").Replace("<", "<\u200B");
         private void Event(string type, JObject data)
         {
             if (type == "DICE_RESULT")

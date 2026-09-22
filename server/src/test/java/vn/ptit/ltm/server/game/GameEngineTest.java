@@ -297,7 +297,7 @@ class GameEngineTest {
         );
         assertEquals("2", currentForfeit.currentPlayerId());
         assertEquals(TurnState.WAITING_FOR_ROLL, currentForfeit.turnState());
-        assertEquals(oneSecondLater.plusSeconds(8).toEpochMilli(), currentForfeit.serverDeadlineEpochMillis());
+        assertEquals(oneSecondLater.plusSeconds(120).toEpochMilli(), currentForfeit.serverDeadlineEpochMillis());
         assertEquals(3, participantById(currentForfeit, "1").rank());
         assertEquals(MatchParticipantStatus.FORFEITED, participantById(currentForfeit, "3").matchStatus());
     }
@@ -515,8 +515,8 @@ class GameEngineTest {
                 TurnState.WAITING_FOR_ROLL,
                 null,
                 List.of(),
-                8_000L,
-                NOW.plusSeconds(8).toEpochMilli(),
+                120_000L,
+                NOW.plusSeconds(120).toEpochMilli(),
                 List.of(participants),
                 specialCells,
                 0L

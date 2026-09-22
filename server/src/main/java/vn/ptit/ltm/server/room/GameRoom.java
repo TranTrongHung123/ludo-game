@@ -1,6 +1,7 @@
 package vn.ptit.ltm.server.room;
 
 import vn.ptit.ltm.common.dto.room.RoomDto;
+import vn.ptit.ltm.common.dto.session.ReconnectResult;
 import vn.ptit.ltm.common.dto.room.RoomPlayerDto;
 import vn.ptit.ltm.common.dto.game.DiceResultDto;
 import vn.ptit.ltm.common.dto.game.GameOverDto;
@@ -141,6 +142,45 @@ final class GameRoom {
                     .findFirst()
                     .orElseThrow(() -> new RoomException(ErrorCode.NOT_IN_ROOM, "Player is not in this room"));
             membersBySlot.put(member.slotIndex(), member.withReady(ready));
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    // Called only after persistence succeeds. Retain live slots/host, not departed participants.
+    boolean reopenForRematch(long requesterUserId) {
+        lock.lock();
+        try {
+            if (closed || departedUserIds.contains(requesterUserId)
+                    || membersBySlot.values().stream().noneMatch(m -> m.userId() == requesterUserId)) {
+                throw new RoomException(ErrorCode.NOT_IN_ROOM, "Player is not in this room");
+            }
+            if (state != RoomState.FINISHED) return false;
+            GameOverDto result = gameOverSnapshot().orElseThrow();
+            membersBySlot.values().removeIf(m -> departedUserIds.contains(m.userId()));
+            membersBySlot.replaceAll((slot, member) -> new RoomMember(
+                    member.userId(), member.displayName(),
+                    result.standings().stream().filter(s -> s.playerId().equals(Long.toString(member.userId())))
+                            .findFirst().orElseThrow().totalScore(),
+                    member.slotIndex(), member.joinOrder(), false));
+            departedUserIds.clear();
+            state = RoomState.WAITING;
+            gameState = null;
+            matchStartedAt = null;
+            matchEndedAt = null;
+            persistedGameOver = null;
+            return true;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    ReconnectResult restore(PlayerSession session, Map<Long, PlayerPresenceState> presence) {
+        lock.lock();
+        try {
+            return new ReconnectResult(true, session.presenceState(), snapshot(presence),
+                    gameState == null ? null : gameSnapshotLocked(presence),
+                    gameOverSnapshot().orElse(null));
         } finally {
             lock.unlock();
         }
