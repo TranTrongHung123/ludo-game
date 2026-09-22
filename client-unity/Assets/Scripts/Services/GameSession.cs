@@ -10,6 +10,7 @@ namespace Ludo.Services
         public JObject LastDice { get; private set; }
         public JObject GameOver { get; private set; }
         public event Action<string, JObject> GameEvent;
+        private string retiredMatchId;
 
         // Responses and broadcasts may reach the main thread in a different order.
         private bool ApplyGameState(JObject snapshot)
@@ -18,10 +19,12 @@ namespace Ludo.Services
                 return false;
             string room = (string)Room?["roomId"];
             if (room == null || (string)snapshot["roomId"] != room) return false;
+            if ((string)snapshot["matchId"] == retiredMatchId) return false;
             if ((string)GameState?["matchId"] == (string)snapshot["matchId"] &&
                 (long?)GameState?["stateVersion"] >= (long)snapshot["stateVersion"]) return false;
             if ((string)GameState?["matchId"] != (string)snapshot["matchId"]) { LastDice = null; GameOver = null; }
             GameState = snapshot;
+            SyncParticipantPresence();
             return true;
         }
 

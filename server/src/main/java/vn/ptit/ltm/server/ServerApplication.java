@@ -2,7 +2,6 @@ package vn.ptit.ltm.server;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import vn.ptit.ltm.common.dto.session.ReconnectResult;
 import vn.ptit.ltm.server.config.DatabaseConfig;
 import vn.ptit.ltm.server.config.DatabaseManager;
 import vn.ptit.ltm.server.network.AuthMessageHandler;
@@ -75,12 +74,7 @@ public final class ServerApplication implements AutoCloseable {
             AuthMessageHandler messageHandler = new AuthMessageHandler(
                     authService,
                     sessions,
-                    session -> new ReconnectResult(
-                            true,
-                            session.presenceState(),
-                            activeRooms.roomForPlayer(session.user().id()).orElse(null),
-                            activeRooms.gameForPlayer(session.user().id()).orElse(null)
-                    ),
+                    activeRooms::restoreSession,
                     heartbeat,
                     lobby,
                     activeRooms,

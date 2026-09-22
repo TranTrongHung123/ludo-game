@@ -1,6 +1,12 @@
-# Unity Login, Register, Lobby, Room, Game, Result, Ranking & History
+# Unity Client — client chính của Ludo Game
 
-Mở project `client-unity` bằng Unity **6000.3.24f1**, mở
+Backend là Java 21 + TCP + MySQL; `../client/` là JavaFX legacy.
+Rà soát mới nhất ngày 2026-09-22: [INTEGRATION_REVIEW.md](../INTEGRATION_REVIEW.md).
+Các số liệu kiểm tra theo từng màn phía dưới là ghi nhận lịch sử, không phải tất cả
+đã được chạy lại trên Editor hiện tại. Sau sửa lỗi, đã đạt 23 kiểm tra hồi quy và
+61 kiểm tra Game/Result qua TCP fixture; chưa chạy Java/MySQL end-to-end.
+
+Mở project `client-unity` bằng Unity theo `ProjectSettings/ProjectVersion.txt` (hiện tại **6000.6.2f1**), mở
 `Assets/Scenes/LoginScene.unity` và nhấn **Play**. LoginScene đã là scene đầu trong Build Settings.
 
 - Canvas uGUI, TextMeshPro tiếng Việt, bố cục 1920×1080; CanvasScaler `Scale With Screen Size`, match `0.5`.
@@ -45,7 +51,7 @@ Player Settings bật Run In Background để cập nhật trạng thái mạng 
 Lobby hỗ trợ tự kết nối lại và gửi `RECONNECT` bằng session cũ trong thời gian tối đa
 60 giây. Chỉ công bố connected sau khi Server xác nhận khôi phục. Phiên hết hạn quay Login.
 Snapshot room/game được khôi phục nếu Server gửi lại; GameScene render lại bàn cờ từ snapshot.
-Không thay đổi code JavaFX, common, server hoặc luật game.
+Contract JSON theo `common/` và handler trong `server/`; Unity không import trực tiếp JAR Java.
 
 ## Kiểm tra đã thực hiện
 
@@ -140,8 +146,10 @@ Mở GameScene trực tiếp trong Play Mode khi chưa đăng nhập sẽ quay L
 - Bỏ cuộc có hộp xác nhận và gửi `LEAVE_ROOM`; chỉ về Lobby sau response thành công.
 - Khi nhận `GAME_OVER` đúng trận, chuyển sang ResultScene để hiển thị kết quả
   chính thức và nút Về sảnh.
-- Khung chat có vị trí riêng bên phải. Gửi chat đang khóa vì Java Server hiện chưa
-  xử lý `CHAT_MESSAGE` (chỉ có enum); không tạo tin nhắn local hoặc protocol mới.
+- Khung chat bên phải gửi `CHAT_MESSAGE(roomId, message)`; Server xác thực membership,
+  giới hạn 200 ký tự và broadcast `ChatMessageDto` trong phòng. Client hiển thị broadcast,
+  không tự thêm tin gửi vào log. Cả tên người gửi và nội dung đều được escape trước
+  khi ghép rich text của ứng dụng.
 
 Đã đạt **39 kiểm tra TCP localhost** trong `AgentScripts/VerifyGame.cs`, entry
 `VerifyGame.Main`: mapping, chuyển Room → Game, pending/chống lặp, lỗi nước đi,
@@ -160,11 +168,11 @@ runtime sử dụng scene/prefab đã lưu, không dựng toàn bộ UI bằng c
 
 Scene `Assets/Scenes/ResultScene.unity` đã có trong Build Settings và dùng prefab
 `Assets/Prefabs/Result/ResultScreen.prefab`; mỗi dòng là `ResultRow.prefab`.
-Unity Editor đang mở màn này để chỉnh trực tiếp. Khi chơi, đi từ Login; nhận
+Có thể mở màn này trong Editor để chỉnh trực tiếp. Khi chơi, đi từ Login; nhận
 `GAME_OVER` sẽ tự chuyển Game → Result. Mở Result trực tiếp khi chưa đăng nhập
 sẽ quay Login; chưa có kết quả sẽ quay màn phù hợp với session hiện tại.
 
-- Giữ phong cách lavender, vương miện/confetti, bảng 5 cột và đúng một nút Về sảnh.
+- Giữ phong cách lavender, vương miện/confetti và bảng 5 cột; có Chơi tiếp và Về sảnh.
 - Hạng, tên hiển thị, màu, trạng thái, điểm nhận và tổng điểm đều từ `GAME_OVER`.
   Sắp dòng theo rank Server, đánh dấu Bạn, giữ điểm lẻ, ẩn dòng không sử dụng.
 - `LEAVE_ROOM(roomId)` dùng kết nối/session đang có; chờ response thành công mới về Lobby.
@@ -254,3 +262,27 @@ uGUI, Input System và Newtonsoft JSON sử dụng Unity Package Manager.
 
 Cụm ngựa/xúc xắc: `Assets/Art/Login/ludo-pieces.png`, tạo bằng công cụ imagegen tích hợp.
 Prompt và nguồn tài nguyên được ghi ở [art-source.md](Documentation/art-source.md).
+
+## Sửa lỗi tích hợp và kiểm tra hồi quy — 2026-09-22
+
+- Presence cập nhật qua ROOM_UPDATED, độc lập với gameplay stateVersion.
+- RECONNECT_RESULT có thêm gameOver tùy chọn: kết quả được khôi phục ngay cả khi
+  client chưa từng nhận event GAME_OVER; chỉ chấp nhận đúng room/match.
+- Profile và header Lobby cập nhật điểm/số lần hạng nhất từ online snapshot Server.
+- Chat escape cả senderDisplayName và message.
+- Result có **Chơi tiếp**: gửi READY, chờ Server mở lại WAITING rồi về RoomScene.
+  Server lưu kết quả trước khi reset, giữ phòng/slot của thành viên còn lại,
+  reset ready, rồi chờ host Start khi mọi người đã Ready.
+- `VerifyIntegrationFixes.Main`: 23 kiểm tra đạt trong Edit Mode, dùng preview scene tạm.
+- `VerifyGame.Main`, args `[false]`: 61 kiểm tra đạt trong Play Mode từ Login,
+  gồm bỏ lỡ GAME_OVER, reconnect, rematch pending/chống lặp và chuyển scene.
+  Args `[true]` bật thêm chụp ảnh/kiểm tra biên ở ba độ phân giải; không chạy chế độ
+  chụp ảnh trong đợt này. Các số liệu ảnh/assertion cũ phía trên là lịch sử.
+
+Giới hạn kiểm thử:
+
+- `VerifyLoginUi`, `VerifyLobby`, `VerifyRoom` có assertion cũ về scene chưa tồn tại;
+  cần cập nhật trước khi dùng làm regression suite cho client đầy đủ.
+- Chưa chạy end-to-end với Java/MySQL thật; chưa build desktop player trong đợt này.
+
+Xem [báo cáo tích hợp](../INTEGRATION_REVIEW.md) cho cách tái hiện và checklist kiểm thử.

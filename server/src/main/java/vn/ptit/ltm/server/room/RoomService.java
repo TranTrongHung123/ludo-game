@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import vn.ptit.ltm.common.dto.chat.ChatMessageDto;
 import vn.ptit.ltm.common.dto.chat.SendChatMessageRequest;
 import vn.ptit.ltm.common.dto.room.RoomDto;
+import vn.ptit.ltm.common.dto.session.ReconnectResult;
 import vn.ptit.ltm.common.dto.room.RoomPayload;
 import vn.ptit.ltm.common.dto.room.InvitationDto;
 import vn.ptit.ltm.common.dto.game.GameStateDto;
@@ -296,7 +297,20 @@ public final class RoomService implements AutoCloseable {
         PlayerSession session = sessionManager.requireAuthenticated(sessionId, connectionId);
         requireRoomId(roomId);
         GameRoom room = roomManager.requireRoomForPlayer(roomId, session.user().id());
-        room.setReady(session.user().id(), ready);
+        synchronized (room) {
+            if (ready) {
+                // Never discard a finished match when saving it failed.
+                persistCompletedMatch(room);
+                if (room.reopenForRematch(session.user().id())) {
+                    timeoutManager.cancel(roomId);
+                    invalidateInvitationsForRoom(roomId);
+                    for (Long userId : room.memberUserIds()) {
+                        sessionManager.updatePresenceForUser(userId, PlayerPresenceState.IN_ROOM);
+                    }
+                }
+            }
+            room.setReady(session.user().id(), ready);
+        }
         LOGGER.info("Player {} set ready={} in room {}", session.user().id(), ready, roomId);
         return snapshot(room);
     }
@@ -400,6 +414,12 @@ public final class RoomService implements AutoCloseable {
 
     public Optional<RoomDto> roomForPlayer(long userId) {
         return roomManager.findByPlayer(userId).map(this::snapshot);
+    }
+
+    public ReconnectResult restoreSession(PlayerSession session) {
+        return roomManager.findByPlayer(session.user().id())
+                .map(room -> room.restore(session, presenceSnapshot()))
+                .orElseGet(() -> new ReconnectResult(true, session.presenceState(), null, null));
     }
 
     public Optional<GameStateDto> gameForPlayer(long userId) {

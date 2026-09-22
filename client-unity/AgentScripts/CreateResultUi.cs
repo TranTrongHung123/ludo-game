@@ -93,6 +93,11 @@ public static class CreateResultUi
         var action=button.gameObject.AddComponent<UnityEngine.UI.Button>();action.targetGraphic=button;Set(controller,"lobbyButton",action);
         var colors=action.colors;colors.highlightedColor=new Color(.94f,.89f,1);colors.pressedColor=new Color(.81f,.72f,.95f);action.colors=colors;
         Set(controller,"lobbyLabel",Center("Label",button.transform,"Về sảnh",0,0,360,66,25,Color.white,true));
+        var rematch=UnityEngine.Object.Instantiate(button.gameObject,content);rematch.name="RematchButton";
+        ((RectTransform)rematch.transform).anchoredPosition=new Vector2(586,-924);
+        ((RectTransform)button.transform).anchoredPosition=new Vector2(974,-924);
+        var rematchText=rematch.GetComponentInChildren<TMP_Text>();rematchText.text="Chơi tiếp";
+        Set(controller,"rematchButton",rematch.GetComponent<UnityEngine.UI.Button>());Set(controller,"rematchLabel",rematchText);
         Set(controller,"feedback",Center("Feedback",content,"",280,1002,1360,40,19,Muted));
         var prefab=PrefabUtility.SaveAsPrefabAsset(canvas,"Assets/Prefabs/Result/ResultScreen.prefab");
         UnityEngine.Object.DestroyImmediate(canvas);PrefabUtility.InstantiatePrefab(prefab,scene);

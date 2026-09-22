@@ -76,9 +76,9 @@ Server chịu trách nhiệm:
 
 - **Java 21**
 - **Maven**
-- **JavaFX**
-- **FXML**
-- **Scene Builder**
+- **Unity 6 + C#** (client chính trong `client-unity/`)
+- **uGUI / Canvas + TextMeshPro**
+- **Newtonsoft.Json** (Unity); **Jackson** (Java)
 - **TCP Socket**
 - **JSON**
 - **Jackson**
@@ -117,20 +117,10 @@ Không ưu tiên:
 # 4. Kiến trúc tổng thể
 
 ```text
-┌──────────────────┐
-│ JavaFX Client 1  │
-└────────┬─────────┘
-         │
-┌────────▼─────────┐
-│ JavaFX Client 2  │
-└────────┬─────────┘
-         │
-┌────────▼─────────┐
-│ JavaFX Client N  │
-└────────┬─────────┘
-         │
-         │ TCP + Length-Prefixed UTF-8 JSON
-         ▼
+Unity Client 1 ─┐
+Unity Client 2 ─┼── TCP + Length-Prefixed UTF-8 JSON
+Unity Client N ─┘              │
+                              ▼
 ┌─────────────────────────────┐
 │         Game Server         │
 │                             │
@@ -155,66 +145,45 @@ Không ưu tiên:
 
 ---
 
-# 5. Kiến trúc Maven khuyến nghị
+# 5. Cấu trúc dự án Java Server và Unity Client
 
 ```text
 ludo-game/
-│
-├── pom.xml
-│
-├── AGENTS.md
-│
-├── common/
-│   ├── pom.xml
-│   └── src/main/java/
-│       ├── model/
-│       ├── dto/
-│       ├── protocol/
-│       ├── enums/
-│       └── error/
-│
-├── server/
-│   ├── pom.xml
-│   └── src/main/java/
-│       ├── network/
-│       ├── session/
-│       ├── lobby/
-│       ├── room/
-│       ├── game/
-│       ├── service/
-│       ├── repository/
-│       ├── config/
-│       └── util/
-│
-└── client/
-    ├── pom.xml
-    └── src/main/
-        ├── java/
-        │   ├── network/
-        │   ├── controller/
-        │   ├── service/
-        │   ├── state/
-        │   └── util/
-        └── resources/
-            ├── fxml/
-            ├── css/
-            └── images/
+├── AGENTS.md                 # Luật và đặc tả trung tâm
+├── DESIGN.md                 # Thiết kế giao diện Unity
+├── pom.xml                   # Maven: common, server, client legacy
+├── common/src/main/java/     # DTO, enum, framing, JSON contract Java
+├── server/src/main/java/     # TCP, session, room, game, service, repository
+├── client-unity/             # Client chính, build bằng Unity Editor
+│   ├── Assets/
+│   │   ├── Scenes/
+│   │   ├── Prefabs/
+│   │   └── Scripts/
+│   │       ├── Network/      # FrameCodec, NetworkClient
+│   │       ├── Services/     # NetworkSession và các partial class
+│   │       ├── Controllers/
+│   │       └── Views/
+│   ├── Packages/
+│   ├── ProjectSettings/
+│   └── AgentScripts/         # Script kiểm tra/authoring ngoài bản build
+└── client/                  # JavaFX cũ, giữ để tham khảo và test legacy
 ```
+
+Unity là client chính. Phiên bản Editor lấy từ
+`client-unity/ProjectSettings/ProjectVersion.txt` (hiện tại `6000.6.2f1`).
+Maven không build Unity; module `client` còn trong reactor là JavaFX legacy.
+Không xóa module cũ hoặc đổi protocol chỉ để cập nhật tài liệu.
 
 ## 5.1. Vai trò module `common`
 
-`common` chứa những lớp được Client và Server dùng chung:
+`common` định nghĩa DTO, enum, message, error code và framing phía Java.
+Unity không import JAR của `common`: C# gửi/đọc cùng JSON contract qua
+`Newtonsoft.Json.Linq.JObject` / `JArray` trong `NetworkSession` hiện tại.
+Mọi thay đổi tên field, kiểu dữ liệu, enum hoặc cấu trúc payload phải kiểm tra cả hai phía.
 
-- DTO;
-- model dùng cho protocol;
-- enum;
-- message;
-- error code;
-- Game State DTO;
-- Room DTO;
-- Player DTO.
-
-Không đặt logic Server-only hoặc JavaFX code vào `common`.
+Không đặt logic Server-only hoặc UI Unity vào `common`.
+`MessageEnvelope + JsonNode data` là biểu diễn Java của envelope trên wire;
+Server map payload sang DTO trước khi gọi nghiệp vụ.
 
 ---
 
@@ -885,34 +854,19 @@ Tên enum cuối cùng có thể thay đổi, nhưng không thay đổi semantic
 
 # 13. Xử lý connection
 
-## 13.1. Thread phía Client
+## 13.1. Thread phía Unity Client
 
-Không được block JavaFX Application Thread bằng network I/O.
+Không block Unity main thread bằng network I/O, `.Wait()` hoặc `.Result`.
+`NetworkClient` dùng `TcpClient`, đọc/ghi bất đồng bộ và serialize writes bằng
+`SemaphoreSlim`; network layer không gọi Unity API.
 
-Sai:
+Event từ reader thread được `NetworkSession` đưa vào `ConcurrentQueue<Action>`.
+`NetworkSession.Update()` lấy từng action ra và cập nhật state/UI trên Unity main thread.
+Các hàm async được gọi từ main thread giữ Unity synchronization context cho phần cập nhật UI.
 
-```java
-socket.getInputStream().read();
-```
-
-trực tiếp trong JavaFX Application Thread.
-
-Phải có thread riêng cho network listener.
-
-Ví dụ:
-
-```java
-ExecutorService networkExecutor =
-        Executors.newSingleThreadExecutor();
-```
-
-Khi cập nhật UI:
-
-```java
-Platform.runLater(() -> {
-    updateUi();
-});
-```
+`NetworkSession` dùng `DontDestroyOnLoad` để giữ socket/session qua các scene.
+Controller phải gỡ đăng ký event khi bị hủy và kiểm tra vòng đời scene sau `await`.
+Không lưu mật khẩu hoặc session token vào log/PlayerPrefs.
 
 ## 13.2. Heartbeat
 
@@ -1076,7 +1030,7 @@ Không random người đi đầu ở phiên bản hiện tại.
 
 Mọi Client và Server phải dùng cùng quy ước này.
 
-Không được tự tạo một hệ tọa độ khác trong JavaFX rồi suy diễn độc lập với Game Engine.
+Không được tự tạo một hệ tọa độ khác trong Unity rồi suy diễn độc lập với Game Engine.
 
 ## 16.2. Global Start Index theo màu
 
@@ -1211,11 +1165,11 @@ entryCell =
 
 ## 16.7. Trách nhiệm UI
 
-JavaFX Client có thể có bảng:
+Unity Client có thể có bảng:
 
 ```text
-globalCell -> Node/coordinate trên màn hình
-finishTrackSlot + color -> Node/coordinate chuồng đích
+globalCell -> RectTransform/coordinate trên màn hình
+finishTrackSlot + color -> RectTransform/coordinate chuồng đích
 ```
 
 Nhưng UI **không được tự tính tiến độ authoritative**.
@@ -1938,21 +1892,21 @@ thì:
 
 # 28. Timeout mỗi lượt
 
-Quy tắc gốc của dự án là **một lượt bình thường tối đa 20 giây**.
+Theo yêu cầu cập nhật ngày 2026-09-22, **mỗi phase có 120 giây**, một lượt bình thường tối đa 240 giây.
 
 Để tránh trường hợp người chơi Roll quá muộn rồi gần như không còn thời gian chọn quân, thời gian được chia thành **hai phase độc lập**.
 
 Bản chính:
 
 ```text
-WAITING_FOR_ROLL → 8 giây
-WAITING_FOR_MOVE → 12 giây
+WAITING_FOR_ROLL → 120 giây
+WAITING_FOR_MOVE → 120 giây
 ```
 
 Tổng tối đa của một lượt bình thường:
 
 ```text
-8 + 12 = 20 giây
+120 + 120 = 240 giây
 ```
 
 Server là nguồn thời gian chính thức.
@@ -1965,7 +1919,7 @@ Khi bắt đầu lượt:
 
 ```text
 TurnState = WAITING_FOR_ROLL
-rollDeadline = serverNow + 8s
+rollDeadline = serverNow + 120s
 ```
 
 Nếu Server không nhận được `ROLL_DICE` hợp lệ trước deadline:
@@ -1981,7 +1935,7 @@ Ngay sau khi Server sinh xúc xắc và xác định có ít nhất một nướ
 
 ```text
 TurnState = WAITING_FOR_MOVE
-moveDeadline = serverNow + 12s
+moveDeadline = serverNow + 120s
 ```
 
 Người chơi luôn có đủ phase Move riêng, bất kể họ bấm Roll ở giây thứ mấy trong phase Roll.
@@ -2004,7 +1958,7 @@ validMoves.isEmpty()
 thì Server:
 
 1. không mở `WAITING_FOR_MOVE`;
-2. không chờ 12 giây;
+2. không chờ 120 giây;
 3. kết thúc lượt ngay;
 4. nếu dice = 6 cũng không cấp bonus.
 
@@ -2028,19 +1982,19 @@ Nếu người chơi được bonus roll:
 
 ```text
 TurnState = WAITING_FOR_ROLL
-rollDeadline = serverNow + 8s
+rollDeadline = serverNow + 120s
 ```
 
 Nếu bonus roll tạo ra nước đi hợp lệ:
 
 ```text
 WAITING_FOR_MOVE
-moveDeadline = serverNow + 12s
+moveDeadline = serverNow + 120s
 ```
 
 Bonus roll tạo một chu kỳ Roll/Move mới của cùng người chơi.
 
-Do đó tổng thời gian thực tế người đó giữ lượt có thể lớn hơn 20 giây nếu liên tiếp nhận bonus; đây là hành vi chủ đích.
+Do đó tổng thời gian thực tế người đó giữ lượt có thể lớn hơn 240 giây nếu liên tiếp nhận bonus; đây là hành vi chủ đích.
 
 ## 28.6. Dữ liệu timer gửi Client
 
@@ -2059,7 +2013,7 @@ serverDeadline
 
 để phục vụ debug/UI.
 
-Quyết định timeout cuối cùng vẫn thuộc Server; countdown trên JavaFX chỉ mang tính hiển thị.
+Quyết định timeout cuối cùng vẫn thuộc Server; countdown trên Unity chỉ mang tính hiển thị.
 
 ---
 
@@ -2133,7 +2087,7 @@ vẫn được `nextTurn()` chọn.
 Khi tới lượt họ:
 
 1. Server tạo phase `WAITING_FOR_ROLL`;
-2. deadline 8 giây vẫn chạy;
+2. deadline 120 giây vẫn chạy;
 3. nếu reconnect trước deadline, Client nhận Full Game State và có thể Roll trong thời gian còn lại;
 4. nếu không thao tác kịp, lượt timeout;
 5. Server chuyển sang participant ACTIVE tiếp theo.
@@ -2382,6 +2336,21 @@ Khi người chơi chọn Thoát:
 ---
 
 # 32. Chơi ván mới
+
+### Luồng triển khai hiện tại
+
+- Nút **Chơi tiếp** trong ResultScene gửi `READY(roomId, ready=true)`.
+- Với phòng FINISHED, Server phải lưu kết quả thành công trước khi mở lại WAITING.
+  Nếu persistence lỗi, giữ nguyên trận và trả lỗi để thử lại.
+- Khi mở lại, loại membership đã rời, giữ roomId/slot/màu/chủ phòng của thành viên
+  còn lại; reset ready của mọi người rồi đặt ready cho người yêu cầu.
+- Thành viên còn lại chuyển sang IN_ROOM; người mất kết nối vẫn DISCONNECTED
+  nhưng trạng thái cần khôi phục khi reconnect là IN_ROOM.
+- Broadcast ROOM_UPDATED đưa Unity về RoomScene và xóa cache trận cũ. Snapshot
+  đến trễ thuộc match đã đóng không được khôi phục trận cũ.
+- Chủ phòng Start khi ít nhất 2 người và tất cả ready/đang kết nối. Ván mới có
+  matchId mới, timer mới, 4 quân IN_YARD/người và hiệu ứng được reset.
+- Về sảnh vẫn gửi LEAVE_ROOM và đợi Server xác nhận.
 
 Sau Game Over, hiển thị:
 
@@ -2687,7 +2656,7 @@ Phụ trách:
 - xử lý lỗi;
 - mất kết nối;
 - reconnect;
-- timeout 20 giây;
+- timeout 240 giây;
 - đồng bộ Game State;
 - xử lý Player rời/mất kết nối;
 - thread safety / concurrency phần mạng.
@@ -2696,7 +2665,7 @@ Giao diện:
 
 - màn hình kết nối Server;
 - trạng thái kết nối;
-- đồng hồ 20 giây;
+- đồng hồ 120 giây cho từng phase Roll/Move;
 - thông báo mất kết nối;
 - thông báo người chơi thoát trận.
 
@@ -2727,7 +2696,7 @@ Message
 
 theo cấu trúc khác nhau.
 
-Phần dùng chung phải nằm trong `common`.
+Contract chuẩn phía Java phải nằm trong `common`; Unity ánh xạ đúng contract JSON tương ứng bằng C#, không tham chiếu trực tiếp assembly/JAR Java.
 
 ---
 
@@ -2753,7 +2722,7 @@ MoveResult movePiece(
 );
 ```
 
-Game Engine không nên trực tiếp gọi JavaFX.
+Game Engine không nên trực tiếp gọi UI Unity.
 
 Game Engine cũng không nên phụ thuộc Socket.
 
@@ -2960,10 +2929,10 @@ Test:
 
 Test:
 
-- quá 8 giây chưa Roll;
-- Roll hợp lệ rồi có đủ 12 giây Move;
+- quá 120 giây chưa Roll;
+- Roll hợp lệ rồi có đủ 120 giây Move;
 - no-valid-move kết thúc ngay, không mở Move phase;
-- bonus roll mở lại phase 8s/12s;
+- bonus roll mở lại phase 120s/120s;
 - phòng 2 người: 1 người forfeit → người còn lại rank 1 ngay;
 - cascading forfeit ở phòng 3/4 người;
 - người forfeit luôn nhận 0 điểm.
@@ -3101,7 +3070,7 @@ Một account chỉ có tối đa một active session, trừ luồng reconnect 
 - lobby;
 - room;
 - listener;
-- JavaFX state update.
+- Unity state update trên main thread.
 
 ## Phase 5 — Gameplay
 
@@ -3201,11 +3170,21 @@ Không ưu tiên extension trước khi core game ổn định.
 - không dùng `System.out.println` cho logging lâu dài;
 - service/repository/network/game tách trách nhiệm.
 
+## 50.1.1. Unity / C#
+
+- Scene/prefab chứa giao diện; controller xử lý tương tác và render.
+- `NetworkClient` chịu trách nhiệm TCP, framing và request correlation.
+- `NetworkSession` giữ trạng thái nhận từ Server xuyên scene.
+- Không tự sinh dice, tính nước đi, cộng điểm hoặc đổi lượt authoritative ở C#.
+- Network event chỉ cập nhật Unity API trên main thread.
+- Snapshot, presence và kết quả sau reconnect phải đồng bộ theo contract Server;
+  xem các sai lệch hiện còn trong `INTEGRATION_REVIEW.md` trước khi sửa cơ chế version.
+
 ## 50.2. SOLID
 
 Không ép SOLID một cách máy móc, nhưng phải đảm bảo:
 
-- Game Rule không dính JavaFX;
+- Game Rule không phụ thuộc Unity/UI;
 - Repository không xử lý gameplay;
 - Network layer không chứa toàn bộ luật;
 - UI controller không query DB trực tiếp;
@@ -3247,7 +3226,7 @@ Không tự ý:
 - thay luật Shield;
 - thay hệ điểm;
 - cho bonus roll cộng dồn;
-- bỏ timeout hoặc đổi mốc phase `8s Roll / 12s Move` mà không cập nhật đặc tả;
+- bỏ timeout hoặc đổi mốc phase `120s Roll / 120s Move` mà không cập nhật đặc tả;
 - bỏ reconnect grace period;
 - thay protocol framing hoặc bỏ `MAX_FRAME_LENGTH`;
 - thay số lượng người chơi;
@@ -3289,8 +3268,8 @@ Nếu cần đổi, phải cập nhật tài liệu này cùng code.
 | Turn Rotation              | `0→1→2→3→0`, chỉ chọn `MatchParticipantStatus.ACTIVE`                          |
 | Disconnected turn          | `DISCONNECTED + ACTIVE` vẫn nhận lượt và vẫn timeout                           |
 | Completed/Forfeited turn   | luôn skip                                                                      |
-| Timeout                    | `WAITING_FOR_ROLL = 8s`, `WAITING_FOR_MOVE = 12s`, Server quản lý              |
-| Bonus action               | Mở chu kỳ phase mới `8s Roll / 12s Move`                                       |
+| Timeout                    | `WAITING_FOR_ROLL = 120s`, `WAITING_FOR_MOVE = 120s`, Server quản lý              |
+| Bonus action               | Mở chu kỳ phase mới `120s Roll / 120s Move`                                       |
 | Disconnect                 | Grace period 60 giây                                                           |
 | Quit                       | Forfeit ngay                                                                   |
 | Host leave                 | Chuyển Host                                                                    |
@@ -3321,7 +3300,7 @@ AI agent hoặc developer phải tự kiểm:
 - [ ] Có làm thay đổi Game Rule không?
 - [ ] Có làm Client thành authoritative không?
 - [ ] Có race condition với Room/Game State không?
-- [ ] Có block JavaFX Application Thread không?
+- [ ] Có block Unity main thread không?
 - [ ] Có xử lý malformed network message không?
 - [ ] Có validate đúng session/turn/room không?
 - [ ] Có test edge case không?
@@ -3379,3 +3358,25 @@ Các quyết định sau là bản chính:
 - Trạng thái hiện diện/kết nối và trạng thái participant trong match là hai khái niệm riêng.
 - Lời mời phòng hết hạn sau đúng 60 giây theo đồng hồ Server; mỗi người nhận chỉ giữ lời mời mới nhất.
 - Mọi thành viên phòng, kể cả chủ phòng, phải Ready trước khi chủ phòng được Start Game.
+
+## 55.2. Client chính và trạng thái kiểm chứng
+
+Từ đợt rà soát ngày 2026-09-22, tài liệu dùng **Unity C# trong `client-unity/`**
+làm client chính; JavaFX trong `client/` chỉ là legacy. Backend vẫn là Java 21,
+TCP length-prefixed UTF-8 JSON và MySQL. Luật game trong tài liệu này giữ nguyên.
+
+Các yêu cầu là đặc tả, không mặc nhiên có nghĩa mọi luồng đã được triển khai hoàn chỉnh.
+Đối chiếu `INTEGRATION_REVIEW.md` để biết kết quả kiểm tra và các giới hạn kiểm thử.
+
+### Contract bổ sung sau sửa lỗi tích hợp
+
+- `RECONNECT_RESULT.data.gameOver` là field tùy chọn, chứa `GameOverDto` của đúng
+  room/match đã kết thúc; null/không có khi chưa có kết quả. Room/game/gameOver
+  được chụp dưới cùng lock phòng. Constructor Java bốn tham số vẫn được giữ.
+- Unity khôi phục kết quả từ snapshot này nếu bỏ lỡ event GAME_OVER. Client cũ
+  có thể bỏ qua field bổ sung; tên message và framing không đổi.
+- Presence được cập nhật từ ROOM_UPDATED độc lập với gameplay stateVersion.
+  Client vẫn loại snapshot gameplay cũ/trùng, không tự tăng version.
+- ONLINE_PLAYERS_UPDATED và response refresh cập nhật profile của chính tài
+  khoản theo playerId; điểm/header Lobby render lại từ các giá trị Server gửi.
+- Chat escape cả tên người gửi và nội dung trước khi ghép rich text do UI tạo.

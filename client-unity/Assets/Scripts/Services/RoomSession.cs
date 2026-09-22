@@ -10,7 +10,7 @@ namespace Ludo.Services
         {
             string id = (string)Room?["roomId"] ?? throw new IOException();
             var result = await AuthenticatedRequest(ready ? "READY" : "UNREADY", new JObject { ["roomId"] = id, ["ready"] = ready });
-            Room = result["room"] as JObject ?? throw new InvalidDataException();
+            ApplyRoom(result["room"] as JObject ?? throw new InvalidDataException());
             LobbyChanged?.Invoke();
         }
         public async Task InvitePlayerAsync(string playerId)

@@ -393,8 +393,8 @@ class RoomServiceTest {
             assertEquals("1", game.currentPlayerId());
             assertEquals(0, game.currentSlot());
             assertEquals(vn.ptit.ltm.common.enums.TurnState.WAITING_FOR_ROLL, game.turnState());
-            assertEquals(8_000L, game.phaseDurationMillis());
-            assertEquals(clock.instant().toEpochMilli() + 8_000L, game.serverDeadlineEpochMillis());
+            assertEquals(120_000L, game.phaseDurationMillis());
+            assertEquals(clock.instant().toEpochMilli() + 120_000L, game.serverDeadlineEpochMillis());
             assertEquals(2, game.participants().size());
             assertEquals(20, game.specialCells().size());
             assertTrue(game.participants().stream().allMatch(participant ->
@@ -482,7 +482,7 @@ class RoomServiceTest {
     }
 
     @Test
-    void rollTimeoutAdvancesExactlyOnceAtEightSecondDeadline() {
+    void rollTimeoutAdvancesExactlyOnceAtTwoMinuteDeadline() {
         try (SessionManager sessions = new SessionManager(Duration.ofSeconds(2))) {
             PlayerSession host = session(sessions, 1);
             PlayerSession second = session(sessions, 2);
@@ -497,13 +497,16 @@ class RoomServiceTest {
                 String roomId = startTwoPlayerGame(rooms, host, second);
 
                 sessions.disconnect(host.connectionId());
-                clock.advance(Duration.ofSeconds(8));
+                clock.advance(Duration.ofMillis(119_999));
+                rooms.processExpiredTurns();
+                assertEquals("1", rooms.gameForPlayer(host.user().id()).orElseThrow().currentPlayerId());
+                clock.advance(Duration.ofMillis(1));
                 rooms.processExpiredTurns();
                 var afterTimeout = rooms.gameForPlayer(host.user().id()).orElseThrow();
                 assertEquals("2", afterTimeout.currentPlayerId());
                 assertEquals(TurnState.WAITING_FOR_ROLL, afterTimeout.turnState());
                 assertEquals(1L, afterTimeout.stateVersion());
-                assertEquals(clock.millis() + 8_000L, afterTimeout.serverDeadlineEpochMillis());
+                assertEquals(clock.millis() + 120_000L, afterTimeout.serverDeadlineEpochMillis());
                 var disconnected = afterTimeout.participants().stream()
                         .filter(participant -> participant.playerId().equals("1"))
                         .findFirst()
@@ -661,7 +664,7 @@ class RoomServiceTest {
                     () -> 6
             )) {
                 String roomId = startTwoPlayerGame(rooms, host, second);
-                clock.advance(Duration.ofSeconds(8));
+                clock.advance(Duration.ofSeconds(120));
 
                 RoomException expired = assertThrows(
                         RoomException.class,
@@ -676,7 +679,7 @@ class RoomServiceTest {
     }
 
     @Test
-    void moveTimeoutUsesTwelveSecondsAndBonusRollGetsFreshEightSeconds() {
+    void moveTimeoutAndBonusRollEachGetTwoMinutes() {
         try (SessionManager sessions = new SessionManager(Duration.ofSeconds(2))) {
             PlayerSession host = session(sessions, 1);
             PlayerSession second = session(sessions, 2);
@@ -692,7 +695,7 @@ class RoomServiceTest {
                 rooms.rollDice(host.sessionId(), host.connectionId(), roomId);
                 var waitingForMove = rooms.gameForPlayer(host.user().id()).orElseThrow();
                 assertEquals(TurnState.WAITING_FOR_MOVE, waitingForMove.turnState());
-                assertEquals(clock.millis() + 12_000L, waitingForMove.serverDeadlineEpochMillis());
+                assertEquals(clock.millis() + 120_000L, waitingForMove.serverDeadlineEpochMillis());
 
                 rooms.movePiece(
                         host.sessionId(),
@@ -703,10 +706,14 @@ class RoomServiceTest {
                 var bonusRoll = rooms.gameForPlayer(host.user().id()).orElseThrow();
                 assertEquals("1", bonusRoll.currentPlayerId());
                 assertEquals(TurnState.WAITING_FOR_ROLL, bonusRoll.turnState());
-                assertEquals(clock.millis() + 8_000L, bonusRoll.serverDeadlineEpochMillis());
+                assertEquals(clock.millis() + 120_000L, bonusRoll.serverDeadlineEpochMillis());
 
                 rooms.rollDice(host.sessionId(), host.connectionId(), roomId);
-                clock.advance(Duration.ofSeconds(12));
+                clock.advance(Duration.ofMillis(119_999));
+                rooms.processExpiredTurns();
+                assertEquals(TurnState.WAITING_FOR_MOVE,
+                        rooms.gameForPlayer(host.user().id()).orElseThrow().turnState());
+                clock.advance(Duration.ofMillis(1));
                 rooms.processExpiredTurns();
                 var afterMoveTimeout = rooms.gameForPlayer(host.user().id()).orElseThrow();
                 assertEquals("2", afterMoveTimeout.currentPlayerId());

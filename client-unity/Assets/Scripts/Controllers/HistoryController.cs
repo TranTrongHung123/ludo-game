@@ -57,7 +57,7 @@ namespace Ludo.Controllers
                 empty.text = "Bạn chưa có trận đấu nào được lưu.";
                 empty.gameObject.SetActive(entries.Count == 0);
                 count.text = entries.Count + " trận gần nhất • " + entries.Count(m => (int)m["rank"] == 1) + " lần hạng nhất";
-                feedback.text = "Lịch sử đã được cập nhật.";
+                feedback.text = "";
                 Canvas.ForceUpdateCanvases(); scroll.StopMovement(); scroll.verticalNormalizedPosition = 1;
             }
             catch (Exception)

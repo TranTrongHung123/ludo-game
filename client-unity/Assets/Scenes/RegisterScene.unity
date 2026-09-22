@@ -1108,6 +1108,14 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 621733630026391059, guid: 19ddc101f3647d24aa7a588975839eee, type: 3}
+      propertyPath: m_TextWrappingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 869175122377207996, guid: 19ddc101f3647d24aa7a588975839eee, type: 3}
+      propertyPath: m_TextWrappingMode
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 1462458296200770172, guid: 19ddc101f3647d24aa7a588975839eee, type: 3}
       propertyPath: m_PlaneDistance
       value: 1
@@ -1194,6 +1202,14 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2646221405420204625, guid: 19ddc101f3647d24aa7a588975839eee, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4723052882940134419, guid: 19ddc101f3647d24aa7a588975839eee, type: 3}
+      propertyPath: m_TextWrappingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6546986888016103190, guid: 19ddc101f3647d24aa7a588975839eee, type: 3}
+      propertyPath: m_TextWrappingMode
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6934696207535997087, guid: 19ddc101f3647d24aa7a588975839eee, type: 3}

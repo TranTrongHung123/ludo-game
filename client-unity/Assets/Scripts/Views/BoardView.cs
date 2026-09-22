@@ -12,11 +12,28 @@ namespace Ludo.Views
         [SerializeField] private RectTransform pieceLayer;
         [SerializeField] private PieceView piecePrefab;
         [SerializeField] private TMP_Text[] cells;
+        [SerializeField] private UnityEngine.UI.Image[] ownYardHighlights;
+        [SerializeField] private TMP_Text[] yardNames;
+        private int ownSlot = -1;
+        private void Update()
+        {
+            if (ownSlot < 0 || ownSlot >= ownYardHighlights.Length) return;
+            var tint = Color.Lerp(BoardGeometry.Tints[ownSlot], Color.black,
+                .16f + .04f * Mathf.Sin(Time.unscaledTime * 3f));
+            tint.a = 1f;
+            ownYardHighlights[ownSlot].color = tint;
+        }
         private readonly Dictionary<string, PieceView> pieces = new Dictionary<string, PieceView>();
         private bool initialized;
         public void Bind(JObject state, string self, string selected, bool canMove, Action<string> select, bool animate)
         {
-            for (int i = 0; i < cells.Length; i++) cells[i].text = i % 12 == 0 ? "→" : "";
+            for (int i = 0; i < cells.Length; i++) cells[i].text = i % 12 == 0 ? new[]{"→", "↓", "←", "↑"}[i / 12] : "";
+            ownSlot = BoardGeometry.Slot((string)(state["participants"] as JArray)?.FirstOrDefault(p => (string)p["playerId"] == self)?["color"]);
+            for (int i = 0; i < ownYardHighlights.Length; i++)
+            {
+                ownYardHighlights[i].gameObject.SetActive(i == ownSlot);
+                yardNames[i].text = BoardGeometry.Names[i].ToUpperInvariant() + (i == ownSlot ? " • BẠN" : "");
+            }
             foreach (var cell in state["specialCells"] as JArray ?? new JArray())
             {
                 int index = (int?)cell["globalIndex"] ?? -1;

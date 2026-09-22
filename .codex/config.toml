@@ -30,6 +30,12 @@ approval_mode = "approve"
 [mcp_servers.unity.tools.editor_stop]
 approval_mode = "approve"
 
+[mcp_servers.unity.tools.console_status]
+approval_mode = "approve"
+
+[mcp_servers.unity.tools.open_scene]
+approval_mode = "approve"
+
 [sandbox_workspace_write]
 network_access = true
 

@@ -66,6 +66,12 @@ namespace Ludo.Controllers
         private void Render()
         {
             if (session == null || navigating) return;
+            if (session.Profile != null)
+            {
+                welcome.text = "Xin chào, " + ((string)session.Profile["displayName"] ?? (string)session.Profile["username"]) + "!";
+                score.text = "Điểm  " + session.Profile["totalScore"];
+                wins.text = "Hạng nhất  " + session.Profile["firstPlaceCount"];
+            }
             if (renderedPlayers != session.OnlinePlayers)
             {
                 renderedPlayers = session.OnlinePlayers;

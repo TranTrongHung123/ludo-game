@@ -53,13 +53,13 @@ namespace Ludo.Services
             {
                 case "ONLINE_PLAYERS_UPDATED":
                     if (data?["players"] is not JArray players) return;
-                    OnlinePlayers = players; onlineVersion++; break;
+                    ApplyOnlinePlayers(players); onlineVersion++; break;
                 case "INVITE_PLAYER":
                     if (data?["invitationId"]?.Type != JTokenType.String || data["expiresAtEpochMillis"]?.Type != JTokenType.Integer) return;
                     Invitation = data; break;
                 case "ROOM_UPDATED":
                     if (data == null) return;
-                    Room = data["room"] as JObject; break;
+                    ApplyRoom(data["room"] as JObject); break;
                 case "GAME_STATE":
                 case "GAME_STATE_UPDATED":
                     if (data == null) return;
@@ -96,7 +96,7 @@ namespace Ludo.Services
             int version = onlineVersion;
             var data = await AuthenticatedRequest("GET_ONLINE_PLAYERS", new JObject(), "ONLINE_PLAYERS_UPDATED");
             if (data["players"] is not JArray players) throw new InvalidDataException();
-            if (version == onlineVersion) OnlinePlayers = players;
+            if (version == onlineVersion) ApplyOnlinePlayers(players);
             LobbyChanged?.Invoke();
         }
         public async Task EnterRoomAsync(string type, string value = null)
@@ -104,7 +104,7 @@ namespace Ludo.Services
             if (type != "CREATE_ROOM" && type != "JOIN_ROOM" && type != "ACCEPT_INVITE") throw new ArgumentException(nameof(type));
             var data = type == "CREATE_ROOM" ? new JObject() : new JObject { [type == "JOIN_ROOM" ? "roomId" : "invitationId"] = value };
             var result = await AuthenticatedRequest(type, data);
-            Room = result["room"] as JObject ?? throw new InvalidDataException();
+            ApplyRoom(result["room"] as JObject ?? throw new InvalidDataException());
             Invitation = null;
             LobbyChanged?.Invoke();
         }
@@ -127,6 +127,43 @@ namespace Ludo.Services
         {
             SessionId = null; Profile = null; Room = null; ClearGame(); Invitation = null;
             OnlinePlayers = new JArray(); onlineVersion++;
+            retiredMatchId = null;
+        }
+
+        private void ApplyOnlinePlayers(JArray players)
+        {
+            OnlinePlayers = players;
+            if (Profile == null) return;
+            foreach (var player in players)
+            {
+                if ((string)player["playerId"] != (string)Profile["playerId"]) continue;
+                foreach (string field in new[] { "displayName", "totalScore", "firstPlaceCount" })
+                    if (player[field] != null) Profile[field] = player[field].DeepClone();
+                break;
+            }
+        }
+
+        private void ApplyRoom(JObject room)
+        {
+            Room = room;
+            if (room == null) return;
+            if ((string)room["state"] == "WAITING" && GameState != null)
+            {
+                retiredMatchId = (string)GameState["matchId"];
+                ClearGame();
+            }
+            SyncParticipantPresence();
+        }
+
+        // ROOM_UPDATED carries connection changes independently of gameplay stateVersion.
+        private void SyncParticipantPresence()
+        {
+            if (GameState?["participants"] is not JArray participants || Room?["players"] is not JArray players ||
+                (string)GameState["roomId"] != (string)Room["roomId"]) return;
+            foreach (var participant in participants)
+                foreach (var player in players)
+                    if ((string)participant["playerId"] == (string)player["playerId"] && player["presenceState"] != null)
+                        participant["presenceState"] = player["presenceState"].DeepClone();
         }
     }
 }
