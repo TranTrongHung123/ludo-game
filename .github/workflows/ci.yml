@@ -60,7 +60,6 @@ jobs:
             pom.xml
             common/pom.xml
             server/pom.xml
-            client/pom.xml
             .mvn/wrapper/maven-wrapper.properties
 
       - name: Prepare Maven Wrapper
