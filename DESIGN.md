@@ -672,7 +672,7 @@ Message phải đi Server/broadcast thật.
 - di chuyển từng ô;
 - easing;
 - bounce khi đáp.
-- Ô +2/−2: dừng ở ô kích hoạt, nhấn nhãn hiệu ứng rồi mới tiến/lùi theo chặng Server gửi.
+- Ô +3/−1: dừng ở ô kích hoạt, nhấn nhãn hiệu ứng rồi mới tiến/lùi theo chặng Server gửi.
 - Nếu hiệu ứng bị chặn, giữ tại ô kích hoạt và thông báo rõ; không dựng nước đi giả.
 
 ### Capture
@@ -680,7 +680,7 @@ Message phải đi Server/broadcast thật.
 - quân bị bắt về yard.
 
 ### Ô đặc biệt
-- +2: tiến ngay 2 bước; −2: lùi ngay 2 bước; +1: tung thêm; !: về chuồng.
+- +3: tiến ngay 3 bước; −1: lùi ngay 1 bước; xúc xắc kèm dấu cộng: tung thêm; !: về chuồng.
 - Không hiển thị Khiên hoặc hiệu ứng làm chậm lượt sau.
 - Render vị trí và layout từ Server, không tự áp dụng luật tại client.
 

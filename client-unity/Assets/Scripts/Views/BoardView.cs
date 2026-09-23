@@ -12,6 +12,7 @@ namespace Ludo.Views
         [SerializeField] private RectTransform pieceLayer;
         [SerializeField] private PieceView piecePrefab;
         [SerializeField] private TMP_Text[] cells;
+        [SerializeField] private GameObject[] bonusRollIcons;
         [SerializeField] private UnityEngine.UI.Image[] ownYardHighlights;
         [SerializeField] private TMP_Text[] yardNames;
         [SerializeField] private TMP_Text[] finishCounts;
@@ -46,6 +47,7 @@ namespace Ludo.Views
             var move = initialized && animate && sameMatch && version == renderedVersion + 1 ? state["lastMove"] as JObject : null;
             renderedVersion = version; renderedMatch = match;
             for (int i = 0; i < cells.Length; i++) cells[i].text = i % 12 == 0 ? new[]{"→", "↓", "←", "↑"}[i / 12] : "";
+            if (bonusRollIcons != null) foreach (var icon in bonusRollIcons) if (icon != null) icon.SetActive(false);
             ownSlot = BoardGeometry.Slot((string)(state["participants"] as JArray)?.FirstOrDefault(p => (string)p["playerId"] == self)?["color"]);
             for (int i = 0; i < ownYardHighlights.Length; i++)
             {
@@ -56,7 +58,9 @@ namespace Ludo.Views
             {
                 int index = (int?)cell["globalIndex"] ?? -1;
                 if (index < 0 || index >= cells.Length) continue;
-                cells[index].text = (string)cell["type"] switch { "SPEED" => "+2", "SLOW" => "−2", "LUCKY" => "+1", "TRAP" => "!", _ => "" };
+                cells[index].text = (string)cell["type"] switch { "SPEED" => "+3", "SLOW" => "−1", "TRAP" => "!", _ => "" };
+                if ((string)cell["type"] == "LUCKY" && bonusRollIcons != null && index < bonusRollIcons.Length && bonusRollIcons[index] != null)
+                    bonusRollIcons[index].SetActive(true);
             }
             var valid = new HashSet<string>((state["validPieceIds"] as JArray ?? new JArray()).Values<string>());
             var visible = new HashSet<string>();

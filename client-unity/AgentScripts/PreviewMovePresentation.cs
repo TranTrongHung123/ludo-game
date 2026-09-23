@@ -22,15 +22,16 @@ public static class PreviewMovePresentation
         }
         return new JObject { ["roomId"]="preview",["matchId"]="preview",["stateVersion"]=1,["participants"]=members,["specialCells"]=specials,["validPieceIds"]=new JArray() };
     }
-    public static string Main()
+    public static string Main(bool useGameScene = false)
     {
         if(EditorApplication.isPlaying) throw new Exception("Run in Edit Mode.");
-        var scene=EditorSceneManager.NewPreviewScene();
+        var scene=useGameScene ? EditorSceneManager.OpenPreviewScene("Assets/Scenes/GameScene.unity") : EditorSceneManager.NewPreviewScene();
         RenderTexture rt=null; Texture2D texture=null; Camera camera=null;
         var previous=RenderTexture.active;
         try
         {
-            var root=(GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Game/GameScreen.prefab"),scene);
+            var root=useGameScene ? scene.GetRootGameObjects().Single(o=>o.GetComponent<Ludo.Controllers.GameController>()!=null)
+                : (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Game/GameScreen.prefab"),scene);
             var board=root.GetComponentInChildren<BoardView>(true); var snapshot=Snapshot();
             board.Bind(snapshot,"p0",null,false,_=>{},false);
             var players=root.GetComponentsInChildren<PlayerCardView>(true);
@@ -44,7 +45,7 @@ public static class PreviewMovePresentation
             var canvas=root.GetComponent<Canvas>();canvas.renderMode=RenderMode.ScreenSpaceCamera;canvas.worldCamera=camera;canvas.planeDistance=10;
             Canvas.ForceUpdateCanvases(); camera.Render();RenderTexture.active=rt;
             texture=new Texture2D(1920,1080,TextureFormat.RGB24,false);texture.ReadPixels(new Rect(0,0,1920,1080),0,0);texture.Apply();
-            const string path="Documentation/move-presentation-preview.png";File.WriteAllBytes(path,texture.EncodeToPNG());return path;
+            string path=useGameScene ? "Documentation/game-scene-special-cells.png" : "Documentation/move-presentation-preview.png";File.WriteAllBytes(path,texture.EncodeToPNG());return path;
         }
         finally {RenderTexture.active=previous;if(camera!=null)camera.targetTexture=null;if(rt!=null){rt.Release();UnityEngine.Object.DestroyImmediate(rt);}if(texture!=null)UnityEngine.Object.DestroyImmediate(texture);EditorSceneManager.ClosePreviewScene(scene);}
     }

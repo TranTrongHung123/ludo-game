@@ -310,20 +310,21 @@ class GameEngineTest {
     }
 
     @Test
-    void speedMovesTwoExtraStepsWithoutChainingIntoAnotherSpecialCell() {
+    void speedMovesThreeExtraStepsWithoutChainingIntoAnotherSpecialCell() {
         MatchParticipantDto red = participant(
                 "1",
                 0,
                 piece("1", 1, PieceColor.RED, PieceState.ON_TRACK, 0)
         );
-        var rolled = GameEngine.rollDice(stateWithSpecials(red, participant("2", 1)), "1", 2, NOW);
+        var rolled = GameEngine.rollDice(stateWithCells(List.of(new SpecialCellDto(2, SpecialCellType.SPEED),
+                new SpecialCellDto(5, SpecialCellType.TRAP)), red, participant("2", 1)), "1", 2, NOW);
         var moved = GameEngine.movePiece(rolled.gameState(), "1", "1-piece-1", NOW);
 
         assertEquals(SpecialCellType.SPEED, moved.result().triggeredEffect());
-        assertEquals(4, moved.result().piece().stepCount());
+        assertEquals(5, moved.result().piece().stepCount());
         assertEquals(0, moved.gameState().lastMove().fromStep());
         assertEquals(2, moved.gameState().lastMove().landedStep());
-        assertEquals(4, moved.gameState().lastMove().toStep());
+        assertEquals(5, moved.gameState().lastMove().toStep());
     }
 
     @Test
@@ -332,7 +333,7 @@ class GameEngineTest {
                 "1",
                 0,
                 piece("1", 1, PieceColor.RED, PieceState.ON_TRACK, 0),
-                piece("1", 2, PieceColor.RED, PieceState.ON_TRACK, 4)
+                piece("1", 2, PieceColor.RED, PieceState.ON_TRACK, 5)
         );
         var rolled = GameEngine.rollDice(stateWithSpecials(red, participant("2", 1)), "1", 2, NOW);
         var moved = GameEngine.movePiece(rolled.gameState(), "1", "1-piece-1", NOW);
@@ -344,15 +345,17 @@ class GameEngineTest {
     @Test
     void slowMovesBackImmediatelyWithoutChainingOrAffectingNextMove() {
         var red = participant("1", 0, piece("1", 1, PieceColor.RED, PieceState.ON_TRACK, 0));
-        var rolled = GameEngine.rollDice(stateWithSpecials(red, participant("2", 1)), "1", 4, NOW);
+        var rolled = GameEngine.rollDice(stateWithCells(List.of(new SpecialCellDto(4, SpecialCellType.SLOW),
+                new SpecialCellDto(3, SpecialCellType.LUCKY)), red, participant("2", 1)), "1", 4, NOW);
         var moved = GameEngine.movePiece(rolled.gameState(), "1", "1-piece-1", NOW);
         assertEquals(SpecialCellType.SLOW, moved.result().triggeredEffect());
-        assertEquals(2, moved.result().piece().stepCount());
+        assertEquals(3, moved.result().piece().stepCount());
         assertEquals(4, moved.gameState().lastMove().landedStep());
-        assertEquals(2, moved.gameState().lastMove().toStep());
+        assertEquals(3, moved.gameState().lastMove().toStep());
+        assertFalse(moved.result().bonusRoll());
         assertEquals("2", moved.gameState().currentPlayerId());
-        var next = GameEngine.rollDice(stateWithSpecials(participantById(moved.gameState(), "1"), participant("2", 1)), "1", 1, NOW);
-        assertEquals(3, GameEngine.movePiece(next.gameState(), "1", "1-piece-1", NOW).result().piece().stepCount());
+        var next = GameEngine.rollDice(stateWithSpecials(participantById(moved.gameState(), "1"), participant("2", 1)), "1", 2, NOW);
+        assertEquals(5, GameEngine.movePiece(next.gameState(), "1", "1-piece-1", NOW).result().piece().stepCount());
     }
 
     @Test
@@ -404,7 +407,7 @@ class GameEngineTest {
     @Test
     void displacementCapturesOpponentAndStopsAtOwnPiece() {
         for (SpecialCellType type : List.of(SpecialCellType.SPEED, SpecialCellType.SLOW)) {
-            int destination = type == SpecialCellType.SPEED ? 6 : 2;
+            int destination = type == SpecialCellType.SPEED ? 7 : 3;
             var cells = List.of(new SpecialCellDto(4, type));
             var red = participant("1", 0, piece("1", 1, PieceColor.RED, PieceState.ON_TRACK, 0));
             var blue = participant("2", 1, piece("2", 1, PieceColor.BLUE, PieceState.ON_TRACK, destination + 36));
@@ -419,12 +422,12 @@ class GameEngineTest {
     }
 
     @Test
-    void slowCannotMoveBeforeStartButTrapAlwaysReturnsToYard() {
+    void slowReturnsToStartButTrapReturnsToYard() {
         for (SpecialCellType type : List.of(SpecialCellType.SLOW, SpecialCellType.TRAP)) {
             var red = participant("1", 0, piece("1", 1, PieceColor.RED, PieceState.ON_TRACK, 0));
             var state = stateWithCells(List.of(new SpecialCellDto(1, type)), red, participant("2", 1));
             var moved = GameEngine.movePiece(GameEngine.rollDice(state, "1", 1, NOW).gameState(), "1", "1-piece-1", NOW);
-            assertEquals(type == SpecialCellType.TRAP ? -1 : 1, moved.result().piece().stepCount());
+            assertEquals(type == SpecialCellType.TRAP ? -1 : 0, moved.result().piece().stepCount());
         }
     }
 
@@ -442,12 +445,39 @@ class GameEngineTest {
         for (boolean blocked : new boolean[]{false, true}) {
             var red = participant("1", 0,
                     piece("1", 1, PieceColor.RED, PieceState.ON_TRACK, 45),
-                    piece("1", 2, PieceColor.RED, blocked ? PieceState.IN_FINISH_TRACK : PieceState.IN_YARD, blocked ? 48 : -1));
+                    piece("1", 2, PieceColor.RED, blocked ? PieceState.IN_FINISH_TRACK : PieceState.IN_YARD, blocked ? 49 : -1));
             var state = stateWithCells(List.of(new SpecialCellDto(46, SpecialCellType.SPEED)), red, participant("2", 1));
             var moved = GameEngine.movePiece(GameEngine.rollDice(state, "1", 1, NOW).gameState(), "1", "1-piece-1", NOW);
-            assertEquals(blocked ? 46 : 48, moved.result().piece().stepCount());
+            assertEquals(blocked ? 46 : 49, moved.result().piece().stepCount());
             assertEquals(blocked ? PieceState.ON_TRACK : PieceState.IN_FINISH_TRACK, moved.result().piece().state());
         }
+    }
+
+    @Test
+    void newDisplacementsUseRelativeStepsForEveryColor() {
+        for (PieceColor color : PieceColor.values()) {
+            for (int dice : new int[]{2, 4}) {
+                var owner = participant("1", color.slotIndex(), piece("1", 1, color, PieceState.ON_TRACK, 0));
+                var opponent = participant("2", (color.slotIndex() + 1) % 4);
+                var moved = GameEngine.movePiece(GameEngine.rollDice(stateWithSpecials(owner, opponent), "1", dice, NOW).gameState(), "1", "1-piece-1", NOW);
+                int expected = dice == 2 ? 5 : 3;
+                assertEquals(expected, moved.result().piece().stepCount(), color.name());
+                assertEquals(dice, moved.gameState().lastMove().landedStep());
+                assertEquals(expected, moved.gameState().lastMove().toStep());
+                assertEquals(dice == 2 ? SpecialCellType.SPEED : SpecialCellType.SLOW, moved.result().triggeredEffect());
+                assertFalse(moved.result().bonusRoll());
+            }
+        }
+    }
+
+    @Test
+    void slowCanReturnToOriginalStepWhilePreservingIntermediateLanding() {
+        var red = participant("1", 0, piece("1", 1, PieceColor.RED, PieceState.ON_TRACK, 3));
+        var moved = GameEngine.movePiece(GameEngine.rollDice(stateWithSpecials(red, participant("2", 1)), "1", 1, NOW).gameState(), "1", "1-piece-1", NOW);
+        assertEquals(3, moved.result().piece().stepCount());
+        assertEquals(3, moved.gameState().lastMove().fromStep());
+        assertEquals(4, moved.gameState().lastMove().landedStep());
+        assertEquals(3, moved.gameState().lastMove().toStep());
     }
 
     private static GameStateDto state(MatchParticipantDto... participants) {

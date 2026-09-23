@@ -289,7 +289,12 @@ Xem [báo cáo tích hợp](../INTEGRATION_REVIEW.md) cho cách tái hiện và 
 
 ## Ô đặc biệt — 2026-09-23
 
-Bàn cờ có 16 ô: SPEED (+2 bước), SLOW (lùi ngay 2 bước), LUCKY (+1 lần tung),
+Cập nhật mới nhất: SPEED tiến **3 bước**, SLOW lùi **1 bước** ngay.
+Đã đồng bộ prefab và GameScene; cần khởi động lại server bằng code mới.
+Kiểm tra đợt đổi luật: Java 104 test đạt (4 MySQL bỏ qua), Unity 45 kiểm tra Edit Mode
+và 103 kiểm tra Play Mode trên GameScene đạt. Các số liệu bên dưới ghi lại các đợt trước.
+
+Bàn cờ có 16 ô: SPEED (+3 bước), SLOW (lùi ngay 1 bước), LUCKY (+1 lần tung),
 TRAP (về chuồng). Bỏ Khiên và trạng thái làm chậm lượt sau. BoardView chỉ render
 `specialCells` và `stepCount` do Server gửi; reconnect cũng dùng snapshot này.
 Cập nhật Server/client cùng phiên bản; contract bỏ `slowed`, `shielded`, `shieldConsumed`.
@@ -302,9 +307,9 @@ Chưa chạy end-to-end Unity với Java/MySQL hoặc build desktop player cho t
 
 ## Animation và ngựa về đích — 2026-09-23
 
-- Đọc `GameState.lastMove` do Server gửi để animate riêng chặng xúc xắc và chặng +2/−2.
-  Dừng nhấn hiệu ứng khoảng 0,38 giây; có nhãn +2/−2/+1/! tại quân.
-- Bẫy đi tới ô kích hoạt rồi về chuồng; +2/−2 bị chặn có thông báo riêng.
+- Đọc `GameState.lastMove` do Server gửi để animate riêng chặng xúc xắc và chặng +3/−1.
+  Dừng nhấn hiệu ứng khoảng 0,38 giây; có nhãn +3/−1/! và biểu tượng xúc xắc có dấu cộng tại quân.
+- Bẫy đi tới ô kích hoạt rồi về chuồng; +3/−1 bị chặn có thông báo riêng.
 - Ngựa hoàn thành chạm tâm đích, nhấn sáng rồi chuyển lên khay màu có vương miện và bộ đếm.
 - `BoardNotice` tự tắt trong khoảng 2,6 giây, không bắt xác nhận hoặc chặn chuột.
 - Reconnect/hụt snapshot đặt lại đúng vị trí, không phát lại animation/thông báo cũ.
@@ -314,3 +319,19 @@ Chưa chạy end-to-end Unity với Java/MySQL hoặc build desktop player cho t
   `VerifyGame.Main(false)` đạt **61 kiểm tra TCP localhost**. Engine/JSON/room Java đạt.
 - [Ảnh xem trước](Documentation/move-presentation-preview.png) dùng fixture hiển thị,
   không phải dữ liệu trận thật. Chưa kiểm thử end-to-end Unity + Java/MySQL trong đợt này.
+
+### Ký hiệu và thông báo ô đặc biệt
+
+- Ô may mắn dùng hình xúc xắc kèm dấu cộng, phân biệt với +3 bước; hình vẽ uGUI không phụ thuộc glyph của font.
+- Bỏ chú giải dưới bàn cờ. Mẹo nhỏ chỉ giải thích ngắn bốn ô đặc biệt, bỏ hướng dẫn đổ 6 ra quân.
+- Thông báo hiệu ứng/về đích nằm phía trên bàn cờ, nền tím đậm và chữ trắng, tự tắt sau khoảng 2,6 giây.
+- `PolishSpecialCellUi.Main` cập nhật prefab; chạy sau các script authoring giao diện cũ.
+- `GameScene` chứa GameCanvas độc lập: sau cập nhật prefab, chạy
+  `PolishSpecialCellUi.SyncGameScene` khi GameScene đang mở và không có thay đổi chưa lưu.
+  Scene đã được đồng bộ; mẹo nhỏ dùng lưới 2 cột, ký hiệu và mô tả căn riêng.
+  `VerifyMovePresentation.Main(true)` đạt 80 kiểm tra trên scene thực tế.
+  [Ảnh scene đã lưu](Documentation/game-scene-special-cells.png) dùng dữ liệu fixture.
+- Kiểm chứng trên Unity 6000.6.2f1: **45 kiểm tra Edit Mode** (`VerifySpecialCells`) và
+  **80 kiểm tra Play Mode** (`VerifyMovePresentation`), gồm thông báo đủ bốn hiệu ứng/về đích,
+  độ hiển thị, giới hạn màn hình, tự tắt, snapshot trùng và reconnect. Đã xem ảnh fixture phía trên;
+  chưa chạy lại trận TCP với Java/MySQL thật hoặc build player trong đợt chỉnh giao diện này.

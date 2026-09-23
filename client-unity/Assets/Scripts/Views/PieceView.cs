@@ -12,6 +12,7 @@ namespace Ludo.Views
         [SerializeField] private TMP_Text number, effect;
         [SerializeField] private HorseGraphic horse;
         [SerializeField] private GameObject finishBadge;
+        [SerializeField] private GameObject bonusRollIcon;
         private Coroutine motion;
         private int previousStep = -2;
         private int boundSlot, boundIndex;
@@ -62,8 +63,8 @@ namespace Ludo.Views
         private void OnDisable() => Snap();
         public static string EffectMessage(string effect, bool blocked) => effect switch
         {
-            "SPEED" => blocked ? "+2 bị chặn • Giữ nguyên ô" : "Tiến thêm 2 bước!",
-            "SLOW" => blocked ? "−2 bị chặn • Giữ nguyên ô" : "Lùi lại 2 bước!",
+            "SPEED" => blocked ? "+3 bị chặn • Giữ nguyên ô" : "Tiến thêm 3 bước!",
+            "SLOW" => blocked ? "−1 bị chặn • Giữ nguyên ô" : "Lùi lại 1 bước!",
             "LUCKY" => "May mắn • Tung thêm 1 lần!",
             "TRAP" => "Trúng bẫy • Về chuồng!",
             _ => null
@@ -78,7 +79,8 @@ namespace Ludo.Views
             if (message != null)
             {
                 notify?.Invoke(message);
-                effect.text = triggered == "SPEED" ? "+2" : triggered == "SLOW" ? "−2" : triggered == "LUCKY" ? "+1" : "!";
+                effect.text = triggered == "SPEED" ? "+3" : triggered == "SLOW" ? "−1" : triggered == "LUCKY" ? "" : "!";
+                if (bonusRollIcon != null) bonusRollIcon.SetActive(triggered == "LUCKY");
                 effect.gameObject.SetActive(true);
                 halo.gameObject.SetActive(true); halo.color = triggered == "SLOW" || triggered == "TRAP" ? new Color32(244,132,143,255) : new Color32(239,201,91,255);
                 yield return Pulse(.38f);

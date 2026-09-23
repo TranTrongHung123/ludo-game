@@ -94,7 +94,7 @@ public static class CreateGameUi
         Box("Inner",piece.transform,3,3,38,38,Color.white,"circle");var number=Text("Number",piece.transform,"",0,0,44,44,23,Purple,true);number.alignment=TextAlignmentOptions.Center;Set(pieceView,"number",number);
         var effect=Text("Effect",piece.transform,"",28,-10,25,25,17,Purple,true);effect.alignment=TextAlignmentOptions.Center;Set(pieceView,"effect",effect);
         Center((RectTransform)piece.transform,Vector2.zero);var pieceAsset=Save(piece.gameObject,"Piece");UnityEngine.Object.DestroyImmediate(piece.gameObject);Set(view,"piecePrefab",pieceAsset.GetComponent<PieceView>());
-        Text("Legend",boardCard.transform,"+2 Tiến 2 bước   −2 Lùi 2 bước   +1 Tung thêm   ! Về chuồng",20,846,848,28,17,Muted).alignment=TextAlignmentOptions.Center;
+        Text("Legend",boardCard.transform,"+3 Tiến 3 bước   −1 Lùi 1 bước   +1 Tung thêm   ! Về chuồng",20,846,848,28,17,Muted).alignment=TextAlignmentOptions.Center;
 
         var turn=Box("TurnPanel",content,1376,144,496,508,Color.white);
         Text("Title",turn.transform,"LƯỢT HIỆN TẠI",28,20,320,30,17,Purple,true);
