@@ -1,5 +1,17 @@
 # Rà soát Java Server ↔ Unity Client — 2026-09-22
 
+## Luật mới SPEED +3 / SLOW −1 — 2026-09-23
+
+- Server tiến 3/lùi 1 bước ngay; giữ nguyên layout, enum, luật chặn/đá quân và không chain.
+- Unity cập nhật ký hiệu, mẹo nhỏ và thông báo trong prefab lẫn GameScene đã lưu.
+- `mvnw.cmd test`: 108 test, 104 đạt, 4 test MySQL bỏ qua, không lỗi.
+  Bao gồm 24 test GameEngine: cả bốn màu, metadata chặng đi, đá/chặn quân,
+  +3 vào Finish Track, −1 về bước 0 và quay về vị trí ban đầu, không chain sang TRAP/LUCKY.
+- MCP Unity: 45 kiểm tra Edit Mode và 103 kiểm tra Play Mode trên GameScene đạt.
+  Ảnh `client-unity/Documentation/game-scene-special-cells.png` lấy từ scene đã lưu với fixture.
+- Chưa chạy end-to-end Unity với Java/MySQL thật hoặc build player. Cần khởi động lại
+  server bằng code mới; tiến trình server cũ vẫn dùng luật cũ.
+
 ## Cập nhật loại bỏ client desktop cũ — 2026-09-23
 
 - Đã xóa module `client/` và tài nguyên riêng `ui/login.png`.
@@ -208,9 +220,9 @@ Maven không build Unity; hướng dẫn chạy chính
 dùng Unity Hub/Editor/player. Rematch hiện được triển khai theo mục 32 AGENTS.md;
 DESIGN.md cập nhật hai nút Chơi tiếp/Về sảnh. Các kết quả trước sửa được giữ làm
 lịch sử chẩn đoán, tách khỏi kết quả kiểm tra mới ở đầu báo cáo.
-# Cập nhật ô đặc biệt — 2026-09-23
+# Cập nhật ô đặc biệt — 2026-09-23 (kiểm chứng ban đầu)
 
-- Chỉ còn SPEED (+2 bước), SLOW (-2 bước ngay), LUCKY (+1 lần tung), TRAP (về chuồng).
+- Ban đầu: SPEED (+2 bước), SLOW (-2 bước ngay), LUCKY (+1 lần tung), TRAP (về chuồng).
 - Layout 16 ô; bỏ Khiên và trạng thái kéo dài. JSON bỏ `slowed`, `shielded`, `shieldConsumed`.
 - Maven reactor: common, server và client legacy không có test lỗi; 4 test tích hợp MySQL
   được bỏ qua theo cấu hình. Các test engine/JSON đã chạy lại sau bổ sung kiểm tra contract

@@ -61,7 +61,7 @@ class GameStateJsonTest {
         assertFalse(tree.path("piece").has("slowed"));
         assertFalse(tree.path("piece").has("shielded"));
         assertEquals(result, codec.objectMapper().treeToValue(tree, MovePieceResultDto.class));
-        var animated = state.withLastMove(new MovePresentationDto("red-1", 0, 4, 2, SpecialCellType.SLOW));
+        var animated = state.withLastMove(new MovePresentationDto("red-1", 0, 4, 3, SpecialCellType.SLOW));
         assertEquals(animated, codec.objectMapper().treeToValue(codec.objectMapper().valueToTree(animated), GameStateDto.class));
         var legacy = codec.objectMapper().valueToTree(state);
         ((com.fasterxml.jackson.databind.node.ObjectNode) legacy).remove("lastMove");

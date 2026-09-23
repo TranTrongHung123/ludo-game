@@ -138,7 +138,7 @@ public final class GameEngine {
                     case TRAP -> movedPiece = sendToYard(movedPiece);
                     case LUCKY -> luckyBonus = true;
                     case SPEED, SLOW -> {
-                        int displacement = specialCell.type() == SpecialCellType.SPEED ? 2 : -2;
+                        int displacement = specialCell.type() == SpecialCellType.SPEED ? 3 : -1;
                         int effectTarget = movedPiece.stepCount() + displacement;
                         if (isEffectDestinationValid(participants, movedPiece, effectTarget)) {
                             DestinationResolution effectMove = resolveDestination(

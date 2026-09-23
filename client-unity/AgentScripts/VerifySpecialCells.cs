@@ -23,7 +23,7 @@ public static class VerifySpecialCells
             var specials = new JArray();
             var members = new JArray();
             string[] types = { "SPEED", "SLOW", "LUCKY", "TRAP" };
-            string[] symbols = { "+2", "−2", "+1", "!" };
+            string[] symbols = { "+3", "−1", "", "!" };
             for (int slot = 0; slot < 4; slot++)
             {
                 for (int i = 0; i < 4; i++) specials.Add(new JObject { ["globalIndex"] = slot * 12 + 2 + i * 2, ["type"] = types[i] });
@@ -38,6 +38,7 @@ public static class VerifySpecialCells
             {
                 for (int i = 0; i < 4; i++) check(cells[slot * 12 + 2 + i * 2].text == symbols[i], "Special symbol");
                 check(cells[slot * 12 + 10].text == "", "Former shield cell is ordinary");
+                check(cells[slot * 12 + 6].transform.Find("BonusRollIcon").gameObject.activeSelf, "Lucky cell displays dice-plus icon");
             }
             var views = board.GetComponentsInChildren<PieceView>(true);
             check(views.Length == 4, "Pieces rendered without obsolete effect fields");
@@ -51,8 +52,12 @@ public static class VerifySpecialCells
             snapshot["specialCells"] = new JArray();
             board.Bind(snapshot, "p0", null, false, _ => {}, false);
             check(cells[2].text == "" && cells[4].text == "" && cells[6].text == "" && cells[8].text == "", "New snapshot clears old layout");
+            check(!cells[6].transform.Find("BonusRollIcon").gameObject.activeSelf, "New snapshot clears lucky icon");
             var legend = root.GetComponentsInChildren<TMP_Text>(true).Single(t => t.name == "Legend");
-            check(legend.text.Contains("Về chuồng") && legend.text.Contains("Lùi 2 bước") && !legend.text.Contains("Khiên"), "Saved prefab legend matches rules");
+            check(!legend.gameObject.activeSelf, "No legend below board");
+            var tip = root.GetComponentsInChildren<TMP_Text>(true).Single(t => t.name == "TipText");
+            var descriptions = tip.transform.parent.GetComponentsInChildren<TMP_Text>().Where(t => t.name == "Description").Select(t => t.text).ToArray();
+            check(!tip.gameObject.activeSelf && descriptions.SequenceEqual(new[]{"Tiến 3 bước","Lùi 1 bước","Tung thêm 1 lần","Về chuồng"}), "Aligned special-cell tips");
             return checks + " special-cell checks passed";
         }
         finally { PrefabUtility.UnloadPrefabContents(root); }

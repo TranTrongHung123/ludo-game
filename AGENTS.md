@@ -1323,7 +1323,7 @@ Client chỉ hiển thị kết quả.
 
 # 22. Hiệu ứng tức thời
 
-Bàn cờ chỉ có bốn loại ô: tiến 2 bước, lùi 2 bước, thưởng một lần tung và bẫy về chuồng.
+Bàn cờ chỉ có bốn loại ô: tiến 3 bước, lùi 1 bước, thưởng một lần tung và bẫy về chuồng.
 Không có Khiên hoặc trạng thái làm chậm ở lượt sau.
 
 ---
@@ -1402,12 +1402,12 @@ Server đưa toàn bộ layout này vào `GameState.specialCells` khi khởi t�
 Khi dừng đúng ô Tăng tốc:
 
 ```text
-+2 bước
++3 bước
 ```
 
-Nếu phần +2 hợp lệ:
+Nếu phần +3 hợp lệ:
 
-- di chuyển thêm 2 ô.
+- di chuyển thêm 3 ô.
 
 Nếu không hợp lệ do:
 
@@ -1420,12 +1420,12 @@ thì:
 - giữ quân tại ô Tăng tốc;
 - không hủy nước đi gốc.
 
-## 23.3. Lùi 2 bước (`SLOW`)
+## 23.3. Lùi 1 bước (`SLOW`)
 
-Khi dừng đúng ô này, quân lùi **ngay 2 bước** theo `stepCount`.
+Khi dừng đúng ô này, quân lùi **ngay 1 bước** theo `stepCount`.
 Không giảm xúc xắc ở lượt sau, không lưu cờ trạng thái trên quân.
 
-- `targetStep = currentStep - 2`.
+- `targetStep = currentStep - 1`.
 - Nếu `targetStep < 0` hoặc ô đích có quân cùng màu: giữ nguyên tại ô vừa vào.
 - Nếu ô đích có quân đối phương: đá quân đó về chuồng rồi chiếm ô.
 - Nếu ô đích trống: lùi bình thường.
@@ -1455,7 +1455,7 @@ nếu xúc xắc là 6 thì vẫn áp dụng bonus roll ở mục 26.
 Trong một nước đi:
 
 - quân chỉ kích hoạt tối đa **một ô đặc biệt**;
-- vị trí mới do hiệu ứng Tiến 2/Lùi 2 tạo ra không kích hoạt thêm ô đặc biệt.
+- vị trí mới do hiệu ứng Tiến 3/Lùi 1 tạo ra không kích hoạt thêm ô đặc biệt.
 
 Mục tiêu:
 
@@ -1468,7 +1468,7 @@ Mục tiêu:
 # 24. Quy tắc tương tác hiệu ứng và Finish Track
 
 - Finish Track không chứa ô đặc biệt.
-- Hiệu ứng +2 có thể đưa quân từ vòng chung vào Finish Track nếu đích hợp lệ.
+- Hiệu ứng +3 có thể đưa quân từ vòng chung vào Finish Track nếu đích hợp lệ.
 - Không có hiệu ứng kéo dài sang nước đi sau.
 
 ---
@@ -2754,7 +2754,7 @@ Server luôn có khả năng serialize Game State đầy đủ.
 ### Special Cell
 
 - Speed;
-- SLOW: lùi ngay 2 bước, không ảnh hưởng lượt sau;
+- SLOW: lùi ngay 1 bước, không ảnh hưởng lượt sau;
 - LUCKY: thưởng một lần tung, không cộng dồn với dice 6;
 - TRAP: về chuồng, `IN_YARD / -1`, chờ 6 ra lại;
 - lùi trước bước 0 hoặc vào quân cùng màu: giữ nguyên;
@@ -3127,11 +3127,11 @@ Nếu cần đổi, phải cập nhật tài liệu này cùng code.
 | Dừng trên đối thủ          | Đá                                                                             |
 | Spawn gặp own piece        | Không được spawn                                                               |
 | Spawn gặp opponent         | Đá                                                                             |
-| Speed                      | +2 nếu hợp lệ                                                                  |
-| Slow                       | Lùi ngay 2 bước nếu hợp lệ; không ảnh hưởng lượt sau |
+| Speed                      | +3 nếu hợp lệ                                                                  |
+| Slow                       | Lùi ngay 1 bước nếu hợp lệ; không ảnh hưởng lượt sau |
 | Lucky                      | +1 bonus roll                                                                  |
 | Trap                       | Về chuồng ngay: `IN_YARD`, `stepCount = -1` |
-| Lùi 2 lower bound          | Đích `< 0` thì giữ nguyên tại ô SLOW |
+| Lùi 1 lower bound          | Đích `< 0` thì giữ nguyên tại ô SLOW |
 | Chain special effect       | Không                                                                          |
 | Roll 6                     | Bonus sau khi hoàn thành move hợp lệ                                           |
 | Roll 6 nhưng không có move | Không bonus, end turn                                                          |
@@ -3221,7 +3221,7 @@ Tài liệu này tổng hợp:
 
 Các quyết định sau là bản chính:
 
-- Chốt ngày 2026-09-23: SPEED +2 ngay; SLOW -2 ngay; LUCKY +1 lần tung; TRAP về chuồng ngay.
+- Chốt ngày 2026-09-23: SPEED +3 ngay; SLOW -1 ngay; LUCKY +1 lần tung; TRAP về chuồng ngay.
 - Bỏ Khiên và hiệu ứng làm chậm lượt sau. Chỉ 16 ô đặc biệt; không kích hoạt dây chuyền.
 - SLOW có đích âm hoặc bị quân cùng màu chặn thì giữ nguyên tại ô SLOW.
 - Người đi đầu là occupied `slotIndex` nhỏ nhất; thường là Red / Slot 0.
@@ -3259,6 +3259,8 @@ Các yêu cầu là đặc tả, không mặc nhiên có nghĩa mọi luồng đ
 ### Contract ô đặc biệt — 2026-09-23
 
 - `SpecialCellType` chỉ còn `SPEED`, `SLOW`, `LUCKY`, `TRAP`.
+- Theo yêu cầu mới nhất, `SPEED` tiến 3 bước, `SLOW` lùi 1 bước ngay; giữ nguyên vị trí
+  các ô và tên enum. Server/client cần cập nhật cùng phiên bản để nhãn khớp luật.
 - `PieceDto` bỏ `slowed`, `shielded`; `MovePieceResultDto` bỏ `shieldConsumed`.
 - Giữ `triggeredEffect`, `bonusRoll`, `gameState`, framing và tên message.
 - Server và client phải cập nhật cùng phiên bản vì SLOW/TRAP đã đổi nghĩa.

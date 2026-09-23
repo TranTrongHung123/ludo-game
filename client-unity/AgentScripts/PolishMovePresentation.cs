@@ -75,11 +75,11 @@ public static class PolishMovePresentation
             for (int i=0;i<4;i++) field.GetArrayElementAtIndex(i).objectReferenceValue=counts[i];
             so.ApplyModifiedPropertiesWithoutUndo();
             var content = root.transform.Find("Content");
-            // Occupies the existing feedback area while visible; does not cover the board or chat controls.
-            var toast = Rect("BoardNotice", content, new Vector2(1624-960,540-992), new Vector2(496,80));
-            Image(toast,new Color32(242,235,253,255),"rounded");
-            var accent = Image(Rect("Accent",toast,new Vector2(-237,0),new Vector2(5,48)),new Color32(124,88,210,255),"rounded");
-            var label = Text(Rect("Message",toast,new Vector2(5,0),new Vector2(460,64)),"",new Color32(62,45,91,255),21);
+            // Prominent above the board, without intercepting gameplay input.
+            var toast = Rect("BoardNotice", content, new Vector2(-60,392), new Vector2(640,84));
+            Image(toast,new Color32(69,45,112,255),"rounded");
+            var accent = Image(Rect("Accent",toast,new Vector2(-307,0),new Vector2(5,48)),new Color32(124,88,210,255),"rounded");
+            var label = Text(Rect("Message",toast,new Vector2(5,0),new Vector2(596,68)),"",Color.white,25);
             label.textWrappingMode = TextWrappingModes.Normal;
             var group = toast.GetComponent<CanvasGroup>(); if (group == null) group = toast.gameObject.AddComponent<CanvasGroup>();
             group.alpha=0; group.blocksRaycasts=false; group.interactable=false;
