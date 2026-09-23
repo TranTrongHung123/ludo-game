@@ -48,8 +48,7 @@ ludo-game/
 ├── pom.xml
 ├── common/
 ├── server/
-├── client-unity/    # Client chính
-└── client/          # JavaFX legacy
+└── client-unity/    # Unity C# client
 ```
 
 ### `common`
@@ -87,10 +86,8 @@ Unity project có scenes, prefabs, uGUI/TextMeshPro và C# scripts:
 - `Controllers/` và `Views/`: tương tác và render dữ liệu Server.
 - `AgentScripts/`: kiểm tra/authoring, không đưa vào player build.
 
-### `client` — legacy
-
-Client JavaFX cũ được giữ để tham khảo và chạy test cũ. Module vẫn nằm trong
-Maven reactor; không phải client dùng cho hướng dẫn demo hiện tại.
+Maven chỉ build `common` và `server`; Unity build riêng trong Editor.
+Các kiểm thử TCP độc lập nằm trong `server/src/test/`.
 
 ## Quy mô game
 
@@ -109,7 +106,7 @@ Maven reactor; không phải client dùng cho hướng dẫn demo hiện tại.
 - Dừng trên quân đối phương thì đá quân.
 - Đạt chính xác nấc 6 của Finish Track thì quân hoàn thành.
 - 4 quân hoàn thành -> người chơi hoàn thành trận.
-- Có các ô đặc biệt: Speed, Slow, Lucky, Trap, Shield.
+- Có các ô đặc biệt: SPEED (+2 bước), SLOW (-2 bước ngay), LUCKY (+1 lần tung), TRAP (về chuồng).
 
 Chi tiết đầy đủ xem [`AGENTS.md`](./AGENTS.md).
 
@@ -120,7 +117,7 @@ Hướng dẫn chạy ngắn bằng PowerShell xem tại [`RUN.md`](./RUN.md).
 Backend sử dụng Maven multi-module; Unity build riêng bằng Editor.
 Để build backend: `.\mvnw.cmd -pl server -am install`.
 
-Build toàn bộ module Java (bao gồm client legacy) bằng Maven Wrapper (không cần cài Maven riêng):
+Build backend Java (`common` và `server`) bằng Maven Wrapper (không cần cài Maven riêng):
 
 ```powershell
 .\mvnw.cmd install
@@ -233,8 +230,8 @@ Server hiện hỗ trợ end-to-end:
 - Ready/Unready và Start Game do chủ phòng thực hiện khi tối thiểu 2 người đã Ready;
 - khởi tạo Game State authoritative, 4 quân mỗi người và lượt đầu theo occupied slot nhỏ nhất;
 - `ROLL_DICE` do Server sinh, tính `validPieceIds` và tự chuyển lượt khi không có nước đi;
-- `MOVE_PIECE` authoritative với spawn, chặn quân cùng màu, capture/Shield, Finish Track và carry-over;
-- layout cố định 20 ô đặc biệt và xử lý đầy đủ Speed, Slow, Lucky, Trap, Shield mà không chain effect;
+- `MOVE_PIECE` authoritative với spawn, chặn quân cùng màu, capture, Finish Track và carry-over;
+- layout cố định 16 ô đặc biệt và xử lý đầy đủ SPEED (+2 bước), SLOW (-2 bước ngay), LUCKY (+1 lần tung), TRAP (về chuồng) mà không chain effect;
 - bonus roll khi ra 6 hoặc gặp Lucky, turn rotation theo slot, hoàn thành quân/người chơi và xếp hạng trong RAM;
 - `TimeoutManager` authoritative cho phase Roll 120 giây và Move 120 giây, chống callback cũ đổi lượt hai lần bằng `stateVersion`;
 - broadcast `TURN_TIMEOUT` và Game State mới; người chơi `DISCONNECTED + ACTIVE` vẫn nhận lượt và timeout bình thường.
@@ -274,7 +271,8 @@ Chi tiết scene, prefab và script kiểm tra: [client-unity/README.md](client-
 presence, điểm Lobby, escape tên chat và chơi lại cùng phòng qua nút **Chơi tiếp**.
 Chi tiết thay đổi và giới hạn: [INTEGRATION_REVIEW.md](INTEGRATION_REVIEW.md).
 
-- Maven `verify`: 117 test đạt (95 common/server + 22 client legacy), 4 MySQL test skip.
+- Maven `clean verify` sau khi gỡ client desktop cũ: 102 test đạt, 4 MySQL test skip.
+  Gồm 7 test TCP độc lập tại `server/src/test/java/vn/ptit/ltm/server/network/TcpWorkflowIntegrationTest.java`.
 - Unity: 23 kiểm tra hồi quy và 61 kiểm tra Game/Result qua TCP fixture đạt.
 - Chơi tiếp giữ roomId, reset ready/trận cũ sau khi lưu kết quả; host vẫn phải chờ
   tất cả thành viên Ready trước khi Start.

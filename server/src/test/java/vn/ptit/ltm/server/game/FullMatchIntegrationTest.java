@@ -141,10 +141,7 @@ class FullMatchIntegrationTest {
                     playerId,
                     color,
                     PieceState.IN_YARD,
-                    BoardConstants.YARD_STEP,
-                    false,
-                    false
-            ));
+                    BoardConstants.YARD_STEP));
         }
         return new MatchParticipantDto(
                 playerId,

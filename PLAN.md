@@ -167,10 +167,10 @@
 - [x] Special Cell placement
 - [x] Special Cell blacklist
 - [x] Speed Cell
-- [x] Slow Cell
+- [x] Slow Cell: lùi ngay 2 bước
 - [x] Lucky Cell
-- [x] Trap Cell
-- [x] Shield Cell
+- [x] Trap Cell: về chuồng ngay
+- [x] Bỏ Shield Cell và hiệu ứng kéo dài (2026-09-23)
 - [x] Special-effect destination resolution
 - [x] Ngăn chain effect
 - [x] Unit test toàn bộ Special Cells
@@ -211,7 +211,7 @@
 # Phase 13 - Unity Client (client chính)
 
 > Các mục hoàn thành dưới đây phản ánh code/scene đã có. Chưa xác nhận toàn bộ
-> luồng end-to-end Unity + Java + MySQL. JavaFX trong `client/` là legacy.
+> luồng end-to-end Unity + Java + MySQL. Unity là client duy nhất; backend Maven gồm common và server.
 
 - [x] Unity project, C#, uGUI/Canvas và TextMeshPro
 - [x] TCP framing, requestId, heartbeat và session xuyên scene

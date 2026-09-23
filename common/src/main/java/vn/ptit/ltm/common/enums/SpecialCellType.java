@@ -4,6 +4,5 @@ public enum SpecialCellType {
     SPEED,
     SLOW,
     LUCKY,
-    TRAP,
-    SHIELD
+    TRAP
 }

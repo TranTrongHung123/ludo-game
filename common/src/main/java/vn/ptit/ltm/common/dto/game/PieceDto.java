@@ -11,9 +11,7 @@ public record PieceDto(
         String ownerPlayerId,
         PieceColor color,
         PieceState state,
-        int stepCount,
-        boolean slowed,
-        boolean shielded
+        int stepCount
 ) {
     public PieceDto {
         Objects.requireNonNull(pieceId, "pieceId");

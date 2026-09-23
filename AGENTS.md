@@ -151,10 +151,10 @@ Unity Client N ─┘              │
 ludo-game/
 ├── AGENTS.md                 # Luật và đặc tả trung tâm
 ├── DESIGN.md                 # Thiết kế giao diện Unity
-├── pom.xml                   # Maven: common, server, client legacy
+├── pom.xml                   # Maven: common, server
 ├── common/src/main/java/     # DTO, enum, framing, JSON contract Java
 ├── server/src/main/java/     # TCP, session, room, game, service, repository
-├── client-unity/             # Client chính, build bằng Unity Editor
+└── client-unity/             # Client chính, build bằng Unity Editor
 │   ├── Assets/
 │   │   ├── Scenes/
 │   │   ├── Prefabs/
@@ -166,13 +166,13 @@ ludo-game/
 │   ├── Packages/
 │   ├── ProjectSettings/
 │   └── AgentScripts/         # Script kiểm tra/authoring ngoài bản build
-└── client/                  # JavaFX cũ, giữ để tham khảo và test legacy
 ```
 
 Unity là client chính. Phiên bản Editor lấy từ
 `client-unity/ProjectSettings/ProjectVersion.txt` (hiện tại `6000.6.2f1`).
-Maven không build Unity; module `client` còn trong reactor là JavaFX legacy.
-Không xóa module cũ hoặc đổi protocol chỉ để cập nhật tài liệu.
+Maven chỉ build `common` và `server`, không build Unity.
+Theo yêu cầu ngày 2026-09-23, client desktop cũ đã được gỡ.
+Các kiểm thử TCP độc lập nằm trong `server/src/test/`; client duy nhất là Unity.
 
 ## 5.1. Vai trò module `common`
 
@@ -343,12 +343,7 @@ IN_FINISH_TRACK
 FINISHED
 ```
 
-Trạng thái hiệu ứng tách khỏi `PieceState`:
-
-```java
-boolean slowed;
-boolean shielded;
-```
+Không lưu hiệu ứng kéo dài trên quân; ô đặc biệt được xử lý ngay khi dừng tại ô.
 
 ---
 
@@ -1192,14 +1187,6 @@ PieceState = IN_YARD
 stepCount = -1
 ```
 
-Khuyến nghị đồng thời reset các hiệu ứng gắn với quân:
-
-```text
-slowed = false
-shielded = false
-```
-
-để quân ra lại với trạng thái sạch.
 
 ---
 
@@ -1277,10 +1264,6 @@ spawn cell = opponent
 → resolve capture
 ```
 
-Nếu đối phương có Khiên:
-
-- áp dụng quy tắc Khiên;
-- không viết logic riêng mâu thuẫn với di chuyển thông thường.
 
 ---
 
@@ -1312,7 +1295,7 @@ Nếu ô đích có quân đối phương:
 capture
 ```
 
-trừ khi Khiên ngăn việc đá theo quy tắc Khiên.
+
 
 ## 20.5. Không được vượt quá phạm vi hợp lệ
 
@@ -1328,11 +1311,9 @@ move = invalid
 
 Khi quân A kết thúc nước đi đúng tại ô của quân B đối phương:
 
-- nếu B không có Khiên:
-  - B bị đá;
-  - B trở lại bãi/chuồng ban đầu;
-  - B phải lại chờ xúc xắc 6 để ra quân;
-  - A chiếm ô đó.
+- B bị đá và trở lại bãi/chuồng ban đầu;
+- B phải lại chờ xúc xắc 6 để ra quân;
+- A chiếm ô đó rồi xử lý ô đặc biệt nếu có.
 
 Server xử lý toàn bộ.
 
@@ -1340,30 +1321,10 @@ Client chỉ hiển thị kết quả.
 
 ---
 
-# 22. Luật Khiên
+# 22. Hiệu ứng tức thời
 
-## 22.1. Nhận Khiên
-
-Khi quân dừng đúng ô Khiên:
-
-```text
-piece.shielded = true
-```
-
-## 22.2. Bị tấn công khi có Khiên
-
-Khi đối phương có một nước đi hợp lệ đến đúng ô của quân có Khiên:
-
-1. Khiên kích hoạt;
-2. quân được bảo vệ không bị đá;
-3. Khiên bị tiêu hao;
-4. quân tấn công không chiếm được ô đó;
-5. quân tấn công giữ nguyên / trở về vị trí trước nước đi;
-6. hành động di chuyển đã được sử dụng.
-
-Không cho hai quân khác màu đứng chung ô.
-
-Không coi ô có Khiên là vĩnh viễn bất khả xâm phạm.
+Bàn cờ chỉ có bốn loại ô: tiến 2 bước, lùi 2 bước, thưởng một lần tung và bẫy về chuồng.
+Không có Khiên hoặc trạng thái làm chậm ở lượt sau.
 
 ---
 
@@ -1423,14 +1384,15 @@ Mục tiêu:
 
 ### Layout canonical hiện tại
 
-Phiên bản hiện tại dùng layout cố định, đối xứng qua bốn phần tư của vòng chung:
+Phiên bản hiện tại có 16 ô đặc biệt, đối xứng qua bốn phần tư của vòng chung.
+Các ô 10, 22, 34, 46 là ô thường. Tên enum trên wire và vị trí:
+
 
 ```text
 SPEED  → 2, 14, 26, 38
 SLOW   → 4, 16, 28, 40
 LUCKY  → 6, 18, 30, 42
 TRAP   → 8, 20, 32, 44
-SHIELD → 10, 22, 34, 46
 ```
 
 Server đưa toàn bộ layout này vào `GameState.specialCells` khi khởi tạo trận. Client render đúng danh sách Server gửi, không tự tạo layout riêng.
@@ -1458,35 +1420,16 @@ thì:
 - giữ quân tại ô Tăng tốc;
 - không hủy nước đi gốc.
 
-## 23.3. Làm chậm
+## 23.3. Lùi 2 bước (`SLOW`)
 
-Khi dừng đúng ô Làm chậm:
+Khi dừng đúng ô này, quân lùi **ngay 2 bước** theo `stepCount`.
+Không giảm xúc xắc ở lượt sau, không lưu cờ trạng thái trên quân.
 
-```java
-piece.slowed = true;
-```
-
-Lần tiếp theo chính quân đó được chọn:
-
-```text
-actualSteps = max(0, dice - 2)
-```
-
-Sau khi áp dụng:
-
-```java
-piece.slowed = false;
-```
-
-Nếu kết quả bằng 0:
-
-- quân đứng nguyên;
-- Slow bị tiêu hao;
-- hành động di chuyển được xem là đã hoàn thành.
-
-Nếu người chơi chọn quân khác:
-
-- Slow của quân đang bị ảnh hưởng vẫn còn.
+- `targetStep = currentStep - 2`.
+- Nếu `targetStep < 0` hoặc ô đích có quân cùng màu: giữ nguyên tại ô vừa vào.
+- Nếu ô đích có quân đối phương: đá quân đó về chuồng rồi chiếm ô.
+- Nếu ô đích trống: lùi bình thường.
+- Không kích hoạt ô đặc biệt ở đích của hiệu ứng.
 
 ## 23.4. May mắn
 
@@ -1494,72 +1437,25 @@ Khi dừng đúng ô May mắn:
 
 - người chơi nhận quyền tung thêm một lần, nếu nước đi đã hoàn thành hợp lệ.
 
-## 23.5. Bẫy
+## 23.5. Bẫy về chuồng (`TRAP`)
 
-Khi quân dừng đúng ô Bẫy:
-
-```text
-lùi 2 bước theo tiến độ local `stepCount`
-```
-
-Công thức:
-
-```java
-int targetStep = currentStep - 2;
-```
-
-### Giới hạn lùi ở đầu vòng
-
-Bẫy **không bao giờ được đưa quân ngược trở lại Yard**.
-
-Vị trí lùi chỉ có thể hợp lệ khi:
+Khi quân dừng đúng ô Bẫy, Server đưa chính quân đó về chuồng ngay:
 
 ```text
-targetStep >= 0
+PieceState = IN_YARD
+stepCount = -1
 ```
 
-Nếu:
-
-```text
-targetStep < 0
-```
-
-thì:
-
-- hiệu ứng lùi không được thực hiện;
-- quân giữ nguyên tại ô Bẫy;
-- quân không chuyển thành `IN_YARD`;
-- người chơi không phải Roll 6 lại chỉ vì Trap.
-
-Ví dụ:
-
-```text
-currentStep = 1
-targetStep  = 1 - 2 = -1
-
-→ invalid trap destination
-→ giữ nguyên stepCount = 1
-```
-
-### Resolve ô đích của Trap
-
-Nếu `targetStep >= 0`, Server tiếp tục kiểm tra destination:
-
-- có quân cùng màu → không thực hiện lùi, giữ nguyên ở ô Bẫy;
-- có quân đối phương không có Khiên → lùi tới đó và đá quân;
-- có quân đối phương có Khiên → áp dụng đúng quy tắc Khiên;
-- ô hợp lệ và trống → lùi bình thường.
-
-Do Finish Track không chứa special cell, hiệu ứng Trap chỉ phát sinh từ một special cell trên vòng chung.
-
-Vị trí mới do Trap tạo ra **không kích hoạt thêm special cell**.
+Quân phải chờ xúc xắc 6 để ra lại. Nếu có đối phương ở ô Bẫy,
+resolve capture trước rồi đưa quân di chuyển về chuồng. Nước đi vẫn đã hoàn thành;
+nếu xúc xắc là 6 thì vẫn áp dụng bonus roll ở mục 26.
 
 ## 23.6. Không kích hoạt hiệu ứng dây chuyền
 
 Trong một nước đi:
 
 - quân chỉ kích hoạt tối đa **một ô đặc biệt**;
-- vị trí mới do hiệu ứng Tăng tốc/Bẫy tạo ra không kích hoạt thêm ô đặc biệt.
+- vị trí mới do hiệu ứng Tiến 2/Lùi 2 tạo ra không kích hoạt thêm ô đặc biệt.
 
 Mục tiêu:
 
@@ -1571,20 +1467,9 @@ Mục tiêu:
 
 # 24. Quy tắc tương tác hiệu ứng và Finish Track
 
-Khuyến nghị chốt để tránh mơ hồ:
-
-- Finish Track không chứa ô đặc biệt;
-- quân trong Finish Track không kích hoạt ô đặc biệt mới;
-- Slow đã có từ trước vẫn có thể ảnh hưởng lần di chuyển tiếp theo của chính quân đó trong Finish Track;
-- Khiên đã có từ trước không còn ý nghĩa chiến đấu khi quân đã vào Finish Track riêng của màu mình, vì đối phương không vào khu vực đó;
-- có thể giữ flag Khiên trong model nhưng Game Rule bỏ qua nó trong Finish Track, hoặc xóa Khiên khi vào Finish Track để đơn giản.
-
-Ưu tiên cách đơn giản:
-
-```text
-khi quân vào Finish Track
-→ shielded = false
-```
+- Finish Track không chứa ô đặc biệt.
+- Hiệu ứng +2 có thể đưa quân từ vòng chung vào Finish Track nếu đích hợp lệ.
+- Không có hiệu ứng kéo dài sang nước đi sau.
 
 ---
 
@@ -1685,7 +1570,7 @@ Riêng `slot 6`:
 
 ## 25.5. Di chuyển khi đã ở Finish Track
 
-Số bước dùng `actualSteps` sau khi áp dụng Slow nếu có.
+Số bước cơ bản bằng kết quả xúc xắc do Server sinh.
 
 Ví dụ:
 
@@ -2853,7 +2738,6 @@ Server luôn có khả năng serialize Game State đầy đủ.
 - spawn trống;
 - spawn bị own piece chặn;
 - spawn đá đối phương;
-- spawn gặp Shield.
 
 ### Tọa độ và Finish Track
 
@@ -2870,14 +2754,11 @@ Server luôn có khả năng serialize Game State đầy đủ.
 ### Special Cell
 
 - Speed;
-- Slow;
-- Lucky;
-- Trap;
-- Trap tại `stepCount = 1` không được lùi về `-1`;
-- Trap destination có own piece;
-- Trap destination có opponent;
-- Trap destination có opponent + Shield;
-- Shield;
+- SLOW: lùi ngay 2 bước, không ảnh hưởng lượt sau;
+- LUCKY: thưởng một lần tung, không cộng dồn với dice 6;
+- TRAP: về chuồng, `IN_YARD / -1`, chờ 6 ra lại;
+- lùi trước bước 0 hoặc vào quân cùng màu: giữ nguyên;
+- đích của hiệu ứng có đối phương: capture;
 - không chain effect.
 
 ### Bonus
@@ -2976,7 +2857,7 @@ Chỉ Server sinh dice.
 
 Không có hai quân cùng màu kết thúc ở cùng một ô logical đang chiếm chỗ.
 
-Không có hai quân khác màu cùng ô sau khi resolve capture/shield.
+Không có hai quân khác màu cùng ô sau khi resolve capture.
 
 ## 46.6. Piece progress
 
@@ -3019,17 +2900,10 @@ DISCONNECTED != FORFEITED
 
 cho tới khi reconnect grace period hết hạn hoặc người chơi chủ động Quit.
 
-## 46.10. Trap lower bound
+## 46.10. Giới hạn hiệu ứng
 
-Trap không được tạo authoritative position:
-
-```text
-stepCount < 0
-```
-
-cho một quân đang ở trên bàn.
-
-Nếu `currentStep - 2 < 0`, quân giữ nguyên tại ô Trap.
+SLOW không được lùi trước bước 0; đích âm thì giữ nguyên tại ô SLOW.
+TRAP luôn tạo `IN_YARD` với `stepCount = -1`.
 
 ## 46.11. Session
 
@@ -3223,7 +3097,7 @@ Không tự ý:
 - cho Client tự sinh xúc xắc;
 - cho Client tự update authoritative state;
 - thay luật Finish Track;
-- thay luật Shield;
+- thay luật bốn ô đặc biệt;
 - thay hệ điểm;
 - cho bonus roll cộng dồn;
 - bỏ timeout hoặc đổi mốc phase `120s Roll / 120s Move` mà không cập nhật đặc tả;
@@ -3253,12 +3127,11 @@ Nếu cần đổi, phải cập nhật tài liệu này cùng code.
 | Dừng trên đối thủ          | Đá                                                                             |
 | Spawn gặp own piece        | Không được spawn                                                               |
 | Spawn gặp opponent         | Đá                                                                             |
-| Shield                     | Đỡ 1 lần, Shield mất, attacker không chiếm ô                                   |
 | Speed                      | +2 nếu hợp lệ                                                                  |
-| Slow                       | `max(0, dice - 2)` ở lần di chuyển tiếp theo của quân                          |
+| Slow                       | Lùi ngay 2 bước nếu hợp lệ; không ảnh hưởng lượt sau |
 | Lucky                      | +1 bonus roll                                                                  |
-| Trap                       | -2 nếu hợp lệ                                                                  |
-| Trap lower bound           | `targetStep = currentStep - 2`; nếu `< 0` thì giữ nguyên ở Trap, không về Yard |
+| Trap                       | Về chuồng ngay: `IN_YARD`, `stepCount = -1` |
+| Lùi 2 lower bound          | Đích `< 0` thì giữ nguyên tại ô SLOW |
 | Chain special effect       | Không                                                                          |
 | Roll 6                     | Bonus sau khi hoàn thành move hợp lệ                                           |
 | Roll 6 nhưng không có move | Không bonus, end turn                                                          |
@@ -3310,7 +3183,7 @@ AI agent hoặc developer phải tự kiểm:
 - [ ] Có làm sai ranking/score không?
 - [ ] Turn Rotation có vô tình chọn `COMPLETED`/`FORFEITED` không?
 - [ ] Có vô tình skip `DISCONNECTED + ACTIVE` không?
-- [ ] Trap có thể tạo `stepCount < 0` không?
+- [ ] Trap trả đúng `IN_YARD / -1`; SLOW không lùi trước bước 0?
 - [ ] First Turn có đúng occupied slot nhỏ nhất không?
 - [ ] Có cần cập nhật `AGENTS.md` không?
 
@@ -3348,7 +3221,9 @@ Tài liệu này tổng hợp:
 
 Các quyết định sau là bản chính:
 
-- Trap không được lùi quân về Yard; `targetStep < 0` → giữ nguyên tại Trap.
+- Chốt ngày 2026-09-23: SPEED +2 ngay; SLOW -2 ngay; LUCKY +1 lần tung; TRAP về chuồng ngay.
+- Bỏ Khiên và hiệu ứng làm chậm lượt sau. Chỉ 16 ô đặc biệt; không kích hoạt dây chuyền.
+- SLOW có đích âm hoặc bị quân cùng màu chặn thì giữ nguyên tại ô SLOW.
 - Người đi đầu là occupied `slotIndex` nhỏ nhất; thường là Red / Slot 0.
 - Turn Rotation chạy theo `0 → 1 → 2 → 3 → 0`.
 - Eligibility của lượt dựa trên `MatchParticipantStatus.ACTIVE`, không dựa riêng vào trạng thái kết nối.
@@ -3362,8 +3237,8 @@ Các quyết định sau là bản chính:
 ## 55.2. Client chính và trạng thái kiểm chứng
 
 Từ đợt rà soát ngày 2026-09-22, tài liệu dùng **Unity C# trong `client-unity/`**
-làm client chính; JavaFX trong `client/` chỉ là legacy. Backend vẫn là Java 21,
-TCP length-prefixed UTF-8 JSON và MySQL. Luật game trong tài liệu này giữ nguyên.
+làm client duy nhất. Backend vẫn là Java 21,
+TCP length-prefixed UTF-8 JSON và MySQL. Luật ô đặc biệt cập nhật ngày 2026-09-23.
 
 Các yêu cầu là đặc tả, không mặc nhiên có nghĩa mọi luồng đã được triển khai hoàn chỉnh.
 Đối chiếu `INTEGRATION_REVIEW.md` để biết kết quả kiểm tra và các giới hạn kiểm thử.
@@ -3380,3 +3255,28 @@ Các yêu cầu là đặc tả, không mặc nhiên có nghĩa mọi luồng đ
 - ONLINE_PLAYERS_UPDATED và response refresh cập nhật profile của chính tài
   khoản theo playerId; điểm/header Lobby render lại từ các giá trị Server gửi.
 - Chat escape cả tên người gửi và nội dung trước khi ghép rich text do UI tạo.
+
+### Contract ô đặc biệt — 2026-09-23
+
+- `SpecialCellType` chỉ còn `SPEED`, `SLOW`, `LUCKY`, `TRAP`.
+- `PieceDto` bỏ `slowed`, `shielded`; `MovePieceResultDto` bỏ `shieldConsumed`.
+- Giữ `triggeredEffect`, `bonusRoll`, `gameState`, framing và tên message.
+- Server và client phải cập nhật cùng phiên bản vì SLOW/TRAP đã đổi nghĩa.
+- Unity render layout và vị trí sau hiệu ứng từ snapshot authoritative, kể cả reconnect.
+
+### Trình diễn nước đi — 2026-09-23
+
+- `GameStateDto.lastMove` là field tùy chọn, chỉ có trong snapshot vừa xử lý một nước đi.
+  Gồm `pieceId`, `fromStep`, `landedStep` (đích xúc xắc trước hiệu ứng), `toStep`
+  (vị trí cuối sau hiệu ứng), `triggeredEffect`. Server tạo dữ liệu này, giữ khi chụp
+  presence và gửi trong cả response/broadcast; roll/timeout tiếp theo không giữ lại.
+- Đây là dữ liệu trình diễn, không phải đầu vào luật. Không đổi framing, MessageType,
+  luật hay deadline. Client cũ được phép bỏ qua field này.
+- Unity chỉ animate snapshot mới liên tiếp của cùng match. Reconnect, snapshot bị bỏ
+  lỡ hoặc thiếu metadata thì đặt quân thẳng tại vị trí authoritative, không phát lại thông báo.
+- Quân đi tới `landedStep`, nhấn hiệu ứng rồi đi tới `toStep`; lùi về đúng vị trí ban đầu
+  vẫn phải có animation. UI refresh hoặc response/broadcast trùng không phát lại.
+- Khi `stepCount = 53`, quân chạm tâm bàn, nhấn hoàn thành rồi chuyển lên khay theo màu.
+  Khay và vương miện chỉ là trình diễn; tiến độ vẫn là `FINISHED / 53`.
+- Thông báo ô đặc biệt/về đích tự tắt sau khoảng 2,6 giây, không yêu cầu xác nhận,
+  không chặn chuột. Kết thúc trận chờ animation/thông báo hiện tại rồi mở Result.

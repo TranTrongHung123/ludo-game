@@ -40,7 +40,7 @@ namespace Ludo.Controllers
                 (string)game["turnState"] == requiredPhase && (long?)game["serverDeadlineEpochMillis"] > now &&
                 (game["participants"] as JArray)?.Any(p => (string)p["playerId"] == self && (string)p["matchStatus"] == "ACTIVE") == true;
         }
-        private bool CanAct(string state) => !busy && !navigating && awaitingStateVersion == null && !confirmation.activeSelf && Connected && MayAct(Game, SelfId, state, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        private bool CanAct(string state) => !busy && !navigating && !board.IsAnimating && awaitingStateVersion == null && !confirmation.activeSelf && Connected && MayAct(Game, SelfId, state, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
         private void Start()
         {
             session = NetworkSession.Instance;
@@ -66,6 +66,7 @@ namespace Ludo.Controllers
         {
             if (session.SessionId == null) { Go("LoginScene"); return; }
             snap = true;
+            board.ResetPresentation();
             awaitingStateVersion = null;
             connection.text = state == ConnectionState.Connected ? "Đã kết nối Game Server" : state == ConnectionState.Connecting ? "Đang khôi phục kết nối..." : "Mất kết nối • Đang thử lại";
             Render();
@@ -78,7 +79,6 @@ namespace Ludo.Controllers
                 if (session?.Room != null && (string)session.Room["state"] == "WAITING") Go("RoomScene");
                 return;
             }
-            if (session.GameOver != null && Application.CanStreamedLevelBeLoaded("ResultScene")) { Go("ResultScene"); return; }
             if (awaitingStateVersion != null && (long?)Game["stateVersion"] > awaitingStateVersion) awaitingStateVersion = null;
             roomLabel.text = "PHÒNG  " + (string)Game["roomId"];
             matchLabel.text = "Trận " + (string)Game["matchId"];
@@ -98,6 +98,11 @@ namespace Ludo.Controllers
                 var rank = Self?["rank"];
                 feedback.text = rank?.Type == JTokenType.Integer ? "Kết thúc • Bạn về hạng " + rank + " • Điểm nhận: " + Self?["scoreEarned"] : "Trận đấu đã kết thúc. Bạn có thể về sảnh.";
             }
+            ShowResultWhenReady();
+        }
+        private void ShowResultWhenReady()
+        {
+            if (session?.GameOver != null && !board.IsAnimating && !board.HasNotice && Application.CanStreamedLevelBeLoaded("ResultScene")) Go("ResultScene");
         }
         private bool moveAllowedLastFrame;
         private void Update()
@@ -111,6 +116,7 @@ namespace Ludo.Controllers
             RefreshActions();
             if (CanMove != moveAllowedLastFrame)
             { moveAllowedLastFrame = CanMove; board.Bind(Game, SelfId, selected, CanMove, SelectPiece, false); }
+            ShowResultWhenReady();
         }
         private void RefreshActions()
         {

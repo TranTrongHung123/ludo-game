@@ -46,7 +46,7 @@ public static class VerifyChat
         {
             var pieces = new JArray();
             for (int i = 0; i < 4; i++)
-                pieces.Add(new JObject { ["pieceId"] = "p" + s + "-" + i, ["ownerPlayerId"] = "p" + s, ["color"] = "RED", ["state"] = "IN_YARD", ["stepCount"] = -1, ["slowed"] = false, ["shielded"] = false });
+                pieces.Add(new JObject { ["pieceId"] = "p" + s + "-" + i, ["ownerPlayerId"] = "p" + s, ["color"] = "RED", ["state"] = "IN_YARD", ["stepCount"] = -1 });
             members.Add(new JObject { ["playerId"] = "p" + s, ["displayName"] = "Người chơi " + s, ["slotIndex"] = s, ["color"] = "RED", ["presenceState"] = "PLAYING", ["matchStatus"] = "ACTIVE", ["rank"] = null, ["scoreEarned"] = 0, ["pieces"] = pieces });
         }
         return new JObject

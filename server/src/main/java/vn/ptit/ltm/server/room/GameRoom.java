@@ -276,7 +276,6 @@ final class GameRoom {
                     result.piece(),
                     result.capturedPieceId(),
                     result.triggeredEffect(),
-                    result.shieldConsumed(),
                     result.bonusRoll(),
                     gameSnapshotLocked(presenceByUserId)
             );
@@ -658,7 +657,8 @@ final class GameRoom {
                 gameState.serverDeadlineEpochMillis(),
                 participants,
                 gameState.specialCells(),
-                gameState.stateVersion()
+                gameState.stateVersion(),
+                gameState.lastMove()
         );
     }
 
@@ -731,10 +731,7 @@ final class GameRoom {
                     playerId,
                     color,
                     PieceState.IN_YARD,
-                    BoardConstants.YARD_STEP,
-                    false,
-                    false
-            ));
+                    BoardConstants.YARD_STEP));
         }
         return new MatchParticipantDto(
                 playerId,
