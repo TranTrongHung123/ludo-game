@@ -23,8 +23,22 @@ public record GameStateDto(
         Long serverDeadlineEpochMillis,
         List<MatchParticipantDto> participants,
         List<SpecialCellDto> specialCells,
-        long stateVersion
+        long stateVersion,
+        MovePresentationDto lastMove
 ) {
+    public GameStateDto(String roomId, String matchId, RoomState roomState, String currentPlayerId,
+                        Integer currentSlot, TurnState turnState, Integer diceValue, List<String> validPieceIds,
+                        long phaseDurationMillis, Long serverDeadlineEpochMillis, List<MatchParticipantDto> participants,
+                        List<SpecialCellDto> specialCells, long stateVersion) {
+        this(roomId, matchId, roomState, currentPlayerId, currentSlot, turnState, diceValue, validPieceIds,
+                phaseDurationMillis, serverDeadlineEpochMillis, participants, specialCells, stateVersion, null);
+    }
+
+    public GameStateDto withLastMove(MovePresentationDto move) {
+        return new GameStateDto(roomId, matchId, roomState, currentPlayerId, currentSlot, turnState, diceValue,
+                validPieceIds, phaseDurationMillis, serverDeadlineEpochMillis, participants, specialCells, stateVersion, move);
+    }
+
     public GameStateDto {
         Objects.requireNonNull(roomId, "roomId");
         Objects.requireNonNull(matchId, "matchId");

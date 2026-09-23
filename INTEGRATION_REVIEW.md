@@ -1,8 +1,20 @@
 # Rà soát Java Server ↔ Unity Client — 2026-09-22
 
+## Cập nhật loại bỏ client desktop cũ — 2026-09-23
+
+- Đã xóa module `client/` và tài nguyên riêng `ui/login.png`.
+- Maven chỉ build `common` + `server`; CI, `ludo.ps1`, `.env.example` và tài liệu đã cập nhật.
+- Bảy luồng kiểm thử tích hợp được viết lại trong `TcpWorkflowIntegrationTest`, dùng Socket
+  và framing chung để kiểm tra Server thật với repository trong bộ nhớ; không giữ implementation
+  client cũ. Luồng reconnect kiểm tra contract khôi phục phiên, còn tự reconnect Unity được
+  kiểm chứng bằng các fixture Unity đã nêu bên dưới.
+- `mvnw clean verify`: 106 test, 102 đạt, 4 MySQL test skip, 0 lỗi; exit code 0.
+- Các số liệu nhắc tới module đã gỡ ở các đợt cũ bên dưới chỉ là lịch sử kiểm chứng.
+
 Client chính: `client-unity/`, C#, Unity `6000.6.2f1` theo ProjectVersion và Editor
 đang kết nối. Backend: `common/` + `server/`, Java 21, TCP, MySQL.
-`client/` là JavaFX legacy còn trong Maven reactor.
+Cập nhật 2026-09-23: Maven chỉ còn common + server; client duy nhất là Unity.
+Số liệu của đợt rà soát cũ dưới đây được giữ như lịch sử kiểm chứng.
 
 ## Kết luận
 
@@ -172,7 +184,7 @@ không chơi end-to-end với Java/MySQL thật. Các test fixture C# không tha
 test contract với Java thật. Số lượng test lịch sử trong README Unity không phải
 kết quả chạy lại toàn bộ suite ngày hôm nay.
 
-CI hiện chỉ chạy Maven, có MySQL service, vẫn gồm JavaFX legacy; chưa chạy Unity.
+CI chạy Maven common + server, có MySQL service; chưa chạy Unity.
 Một số assertion trong VerifyLoginUi/VerifyLobby/VerifyRoom còn dựa trên giai đoạn
 scene chưa tồn tại, như README Unity đã ghi; cần cập nhật trước khi dùng làm gate.
 
@@ -191,8 +203,34 @@ scene chưa tồn tại, như README Unity đã ghi; cần cập nhật trước
 ## Tài liệu đã cập nhật
 
 `AGENTS.md`, `README.md`, `RUN.md`, `PLAN.md`, `DESIGN.md` và
-`client-unity/README.md` thống nhất Unity là client chính, JavaFX là legacy.
-Maven không build Unity; `ludo.ps1 client` vẫn mở JavaFX, nên hướng dẫn chạy chính
+`client-unity/README.md` thống nhất Unity là client duy nhất.
+Maven không build Unity; hướng dẫn chạy chính
 dùng Unity Hub/Editor/player. Rematch hiện được triển khai theo mục 32 AGENTS.md;
 DESIGN.md cập nhật hai nút Chơi tiếp/Về sảnh. Các kết quả trước sửa được giữ làm
 lịch sử chẩn đoán, tách khỏi kết quả kiểm tra mới ở đầu báo cáo.
+# Cập nhật ô đặc biệt — 2026-09-23
+
+- Chỉ còn SPEED (+2 bước), SLOW (-2 bước ngay), LUCKY (+1 lần tung), TRAP (về chuồng).
+- Layout 16 ô; bỏ Khiên và trạng thái kéo dài. JSON bỏ `slowed`, `shielded`, `shieldConsumed`.
+- Maven reactor: common, server và client legacy không có test lỗi; 4 test tích hợp MySQL
+  được bỏ qua theo cấu hình. Các test engine/JSON đã chạy lại sau bổ sung kiểm tra contract
+  và +2 vào Finish Track, exit code 0.
+- Unity compile thành công, 39 kiểm tra ô đặc biệt và 23 kiểm tra tích hợp Edit Mode đạt;
+  Console không lỗi/cảnh báo. Đã lưu chú giải mới trong GameScreen prefab.
+- Chưa chạy end-to-end Unity + Java/MySQL hoặc build desktop player cho đợt này.
+
+Các phần phía trên ghi lại đợt kiểm chứng trước đó.
+
+## Trình diễn ô đặc biệt và về đích — 2026-09-23
+
+- Thêm `GameState.lastMove` tùy chọn, chứa các chặng đã được Server xác nhận;
+  snapshot của người khác trong phòng cũng nhận cùng metadata. Các phase mới xóa metadata.
+- Unity đi tới ô kích hoạt rồi tiến/lùi; có nhịp nhấn và thông báo tự tắt 2,6 giây.
+  Quân hoàn thành chạm tâm, chuyển lên khay theo màu và mang vương miện.
+- `VerifyMovePresentation.Main`: 66 kiểm tra Play Mode đạt, gồm lùi về vị trí cũ,
+  effect bị chặn, trap, lucky, về đích, refresh trùng, reconnect, hụt version,
+  không chặn input và tự tắt ngay cả khi `timeScale=0`.
+- `VerifyGame.Main(false)`: 61 kiểm tra TCP localhost đạt. 39 kiểm tra SpecialCells
+  và 23 kiểm tra IntegrationFixes Edit Mode cũng đạt.
+- [Ảnh giao diện bằng fixture](client-unity/Documentation/move-presentation-preview.png).
+  Chưa chạy end-to-end Unity với Java/MySQL thật hoặc build player cho đợt này.

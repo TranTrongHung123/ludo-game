@@ -3,7 +3,7 @@
 > Dự án: **Ludo Game / Cờ Cá Ngựa Online**  
 > Client chính: **Unity 6, 2D, C#**; phiên bản Editor theo `client-unity/ProjectSettings/ProjectVersion.txt` (hiện tại `6000.6.2f1`).
 > Server giữ nguyên: **Java 21 + TCP Socket + JSON + MySQL**  
-> Mục tiêu: phát triển client Unity chính thức, giữ protocol và luật Server. JavaFX cũ chỉ là nguồn tham khảo migration.
+> Mục tiêu: phát triển client Unity chính thức, giữ protocol và luật Server.
 > Trạng thái triển khai và lỗi tích hợp còn mở: [INTEGRATION_REVIEW.md](INTEGRATION_REVIEW.md). Tài liệu thiết kế không phải biên bản xác nhận mọi chức năng đã đạt.
 
 ---
@@ -15,7 +15,7 @@ Tài liệu này là tài liệu chuẩn để Codex triển khai phần `client
 Codex phải dùng đồng thời:
 
 - `AGENTS.md` để hiểu luật game, protocol và kiến trúc;
-- `client/` JavaFX cũ để biết các chức năng và nút xử lý sự kiện hiện có;
+- `client-unity/Assets/Scripts/` để đọc chức năng và sự kiện hiện có;
 - `common/` để đọc DTO, enum, message type;
 - `server/` để hiểu luồng request/response/broadcast thực tế;
 - `DESIGN.md` để dựng giao diện Unity đúng phong cách đã chốt.
@@ -23,7 +23,7 @@ Codex phải dùng đồng thời:
 Nguyên tắc:
 
 ```text
-JavaFX cũ = nguồn tham khảo chức năng
+Unity scripts = hiện thực giao diện và tương tác
 common + server + AGENTS.md = nguồn sự thật về protocol và logic
 DESIGN.md + ảnh đã chốt = nguồn sự thật về giao diện
 ```
@@ -32,23 +32,22 @@ Không được thay đổi logic Server chỉ để làm UI dễ hơn.
 
 ---
 
-# 2. Phạm vi migration
+# 2. Phạm vi dự án
 
 Giữ nguyên:
 
 ```text
 server/
 common/
-client/          # chỉ dùng làm tham chiếu
 ```
 
-Triển khai mới:
+Client duy nhất:
 
 ```text
 client-unity/
 ```
 
-Không xóa JavaFX cũ cho đến khi Unity Client hoàn thiện và test ổn định.
+Backend Maven gồm `common` và `server`. Unity build riêng, là client duy nhất.
 
 ---
 
@@ -584,7 +583,6 @@ Client không tự quyết định:
 
 - spawn;
 - capture;
-- shield;
 - special cell;
 - legal move;
 - finish;
@@ -674,16 +672,23 @@ Message phải đi Server/broadcast thật.
 - di chuyển từng ô;
 - easing;
 - bounce khi đáp.
+- Ô +2/−2: dừng ở ô kích hoạt, nhấn nhãn hiệu ứng rồi mới tiến/lùi theo chặng Server gửi.
+- Nếu hiệu ứng bị chặn, giữ tại ô kích hoạt và thông báo rõ; không dựng nước đi giả.
 
 ### Capture
 - flash nhỏ;
 - quân bị bắt về yard.
 
-### Shield
-- shield flash.
+### Ô đặc biệt
+- +2: tiến ngay 2 bước; −2: lùi ngay 2 bước; +1: tung thêm; !: về chuồng.
+- Không hiển thị Khiên hoặc hiệu ứng làm chậm lượt sau.
+- Render vị trí và layout từ Server, không tự áp dụng luật tại client.
 
 ### Finish
 - sparkle/pulse.
+- Chạm tâm đích rồi chuyển vào một trong bốn vị trí trên khay riêng theo màu.
+- Ngựa hoàn thành nhỏ hơn, có huy hiệu vương miện; khay hiện `VỀ ĐÍCH n/4`.
+- Thông báo ngắn ở vùng phản hồi bên phải, tự mờ/tắt sau 2,6 giây, không có nút xác nhận.
 
 ### Turn change
 - highlight player card.
@@ -843,7 +848,7 @@ Không thêm.
 
 # 15. Các tương tác Server bắt buộc phải giữ
 
-Codex phải kiểm tra JavaFX cũ và giữ nguyên mọi chức năng tương ứng.
+Codex phải kiểm tra controller Unity và giữ nguyên mọi chức năng tương ứng.
 
 Danh sách tối thiểu:
 
@@ -1091,7 +1096,7 @@ ranking mẫu
 
 Trước mỗi Scene:
 
-1. đọc JavaFX cũ;
+1. đọc controller Unity và contract Server;
 2. liệt kê nút/sự kiện hiện có;
 3. tìm message type liên quan;
 4. đọc ảnh UI tương ứng;
@@ -1106,7 +1111,7 @@ Trước khi code, Codex phải ghi ngắn:
 
 ```text
 File sẽ tạo/sửa
-Sự kiện JavaFX được giữ
+Sự kiện Unity phải đúng contract
 Message protocol sử dụng
 Dữ liệu động từ Server
 Scene transition
@@ -1131,7 +1136,7 @@ Migration hoàn thành khi:
 - responsive 1440p và 4K;
 - Game dùng bàn cờ vuông truyền thống;
 - Chat không che board;
-- mọi action JavaFX cũ vẫn hoạt động;
+- mọi action được đặc tả trong AGENTS.md hoạt động;
 - không fake state;
 - Server vẫn authoritative;
 - TCP framing đúng;
@@ -1152,7 +1157,7 @@ Không được hiểu nhiệm vụ này là:
 Mà phải hiểu là:
 
 ```text
-JavaFX cũ
+Chức năng trong AGENTS.md
   +
 Protocol hiện tại
   +

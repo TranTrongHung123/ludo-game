@@ -14,22 +14,18 @@ public final class SpecialCellLayout {
             cell(4, SpecialCellType.SLOW),
             cell(6, SpecialCellType.LUCKY),
             cell(8, SpecialCellType.TRAP),
-            cell(10, SpecialCellType.SHIELD),
             cell(14, SpecialCellType.SPEED),
             cell(16, SpecialCellType.SLOW),
             cell(18, SpecialCellType.LUCKY),
             cell(20, SpecialCellType.TRAP),
-            cell(22, SpecialCellType.SHIELD),
             cell(26, SpecialCellType.SPEED),
             cell(28, SpecialCellType.SLOW),
             cell(30, SpecialCellType.LUCKY),
             cell(32, SpecialCellType.TRAP),
-            cell(34, SpecialCellType.SHIELD),
             cell(38, SpecialCellType.SPEED),
             cell(40, SpecialCellType.SLOW),
             cell(42, SpecialCellType.LUCKY),
-            cell(44, SpecialCellType.TRAP),
-            cell(46, SpecialCellType.SHIELD)
+            cell(44, SpecialCellType.TRAP)
     );
 
     private SpecialCellLayout() {

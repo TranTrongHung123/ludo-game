@@ -8,7 +8,6 @@ public record MovePieceResultDto(
         PieceDto piece,
         String capturedPieceId,
         SpecialCellType triggeredEffect,
-        boolean shieldConsumed,
         boolean bonusRoll,
         GameStateDto gameState
 ) {

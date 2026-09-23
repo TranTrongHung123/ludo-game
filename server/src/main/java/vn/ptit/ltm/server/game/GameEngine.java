@@ -4,6 +4,7 @@ import vn.ptit.ltm.common.dto.game.DiceResultDto;
 import vn.ptit.ltm.common.dto.game.GameStateDto;
 import vn.ptit.ltm.common.dto.game.MatchParticipantDto;
 import vn.ptit.ltm.common.dto.game.MovePieceResultDto;
+import vn.ptit.ltm.common.dto.game.MovePresentationDto;
 import vn.ptit.ltm.common.dto.game.PieceDto;
 import vn.ptit.ltm.common.dto.game.SpecialCellDto;
 import vn.ptit.ltm.common.enums.MatchParticipantStatus;
@@ -117,41 +118,26 @@ public final class GameEngine {
 
         List<MatchParticipantDto> participants = new ArrayList<>(state.participants());
         PieceDto original = selected.piece();
-        int actualSteps = actualSteps(original, state.diceValue());
+        int actualSteps = state.diceValue();
         int targetStep = original.state() == PieceState.IN_YARD
                 ? BoardConstants.FIRST_TRACK_STEP
                 : original.stepCount() + actualSteps;
-        PieceDto movedPiece = consumeSlow(original);
-        String capturedPieceId = null;
-        boolean shieldConsumed = false;
+        DestinationResolution baseMove = resolveDestination(participants, original, targetStep, pieceId);
+        PieceDto movedPiece = baseMove.piece();
+        String capturedPieceId = baseMove.capturedPieceId();
         SpecialCellType triggeredEffect = null;
         boolean luckyBonus = false;
-        boolean landed = false;
-
-        if (actualSteps > 0 || original.state() == PieceState.IN_YARD) {
-            DestinationResolution baseMove = resolveDestination(
-                    participants,
-                    movedPiece,
-                    targetStep,
-                    pieceId
-            );
-            movedPiece = baseMove.piece();
-            capturedPieceId = baseMove.capturedPieceId();
-            shieldConsumed = baseMove.shieldConsumed();
-            landed = baseMove.landed();
-        }
         replacePiece(participants, selected, movedPiece);
 
-        if (landed && movedPiece.state() == PieceState.ON_TRACK) {
+        if (movedPiece.state() == PieceState.ON_TRACK) {
             int landedCell = BoardCoordinates.toGlobalCell(movedPiece.color(), movedPiece.stepCount());
             SpecialCellDto specialCell = findSpecialCell(state, landedCell);
             if (specialCell != null) {
                 triggeredEffect = specialCell.type();
                 switch (specialCell.type()) {
-                    case SLOW -> movedPiece = withSlow(movedPiece, true);
-                    case SHIELD -> movedPiece = withShield(movedPiece, true);
+                    case TRAP -> movedPiece = sendToYard(movedPiece);
                     case LUCKY -> luckyBonus = true;
-                    case SPEED, TRAP -> {
+                    case SPEED, SLOW -> {
                         int displacement = specialCell.type() == SpecialCellType.SPEED ? 2 : -2;
                         int effectTarget = movedPiece.stepCount() + displacement;
                         if (isEffectDestinationValid(participants, movedPiece, effectTarget)) {
@@ -165,7 +151,6 @@ public final class GameEngine {
                             if (effectMove.capturedPieceId() != null) {
                                 capturedPieceId = effectMove.capturedPieceId();
                             }
-                            shieldConsumed |= effectMove.shieldConsumed();
                         }
                     }
                 }
@@ -223,11 +208,12 @@ public final class GameEngine {
         }
 
         PieceDto resultPiece = findPiece(nextState.participants(), pieceId).piece();
+        nextState = nextState.withLastMove(new MovePresentationDto(
+                pieceId, original.stepCount(), targetStep, resultPiece.stepCount(), triggeredEffect));
         MovePieceResultDto result = new MovePieceResultDto(
                 resultPiece,
                 capturedPieceId,
                 triggeredEffect,
-                shieldConsumed,
                 bonusRoll,
                 nextState
         );
@@ -362,7 +348,7 @@ public final class GameEngine {
         if (piece.state() == PieceState.IN_YARD && diceValue != GameConstants.SPAWN_DICE_VALUE) {
             return false;
         }
-        int steps = actualSteps(piece, diceValue);
+        int steps = diceValue;
         int targetStep = piece.state() == PieceState.IN_YARD
                 ? BoardConstants.FIRST_TRACK_STEP
                 : piece.stepCount() + steps;
@@ -382,45 +368,21 @@ public final class GameEngine {
                         && other.stepCount() == targetStep);
     }
 
-    private static int actualSteps(PieceDto piece, int diceValue) {
-        return piece.slowed() ? Math.max(0, diceValue - 2) : diceValue;
-    }
-
-    private static PieceDto consumeSlow(PieceDto piece) {
-        if (!piece.slowed()) {
-            return piece;
-        }
-        return new PieceDto(
-                piece.pieceId(),
-                piece.ownerPlayerId(),
-                piece.color(),
-                piece.state(),
-                piece.stepCount(),
-                false,
-                piece.shielded()
-        );
-    }
-
     private static PieceDto moveToStep(PieceDto piece, int targetStep) {
         PieceState targetState;
-        boolean shielded = piece.shielded();
         if (targetStep <= BoardConstants.LAST_RING_STEP) {
             targetState = PieceState.ON_TRACK;
         } else if (targetStep < BoardConstants.LAST_FINISH_STEP) {
             targetState = PieceState.IN_FINISH_TRACK;
-            shielded = false;
         } else {
             targetState = PieceState.FINISHED;
-            shielded = false;
         }
         return new PieceDto(
                 piece.pieceId(),
                 piece.ownerPlayerId(),
                 piece.color(),
                 targetState,
-                targetStep,
-                false,
-                shielded
+                targetStep
         );
     }
 
@@ -430,34 +392,7 @@ public final class GameEngine {
                 piece.ownerPlayerId(),
                 piece.color(),
                 PieceState.IN_YARD,
-                BoardConstants.YARD_STEP,
-                false,
-                false
-        );
-    }
-
-    private static PieceDto withShield(PieceDto piece, boolean shielded) {
-        return new PieceDto(
-                piece.pieceId(),
-                piece.ownerPlayerId(),
-                piece.color(),
-                piece.state(),
-                piece.stepCount(),
-                piece.slowed(),
-                shielded
-        );
-    }
-
-    private static PieceDto withSlow(PieceDto piece, boolean slowed) {
-        return new PieceDto(
-                piece.pieceId(),
-                piece.ownerPlayerId(),
-                piece.color(),
-                piece.state(),
-                piece.stepCount(),
-                slowed,
-                piece.shielded()
-        );
+                BoardConstants.YARD_STEP);
     }
 
     private static SpecialCellDto findSpecialCell(GameStateDto state, int globalCell) {
@@ -496,14 +431,10 @@ public final class GameEngine {
             String excludedPieceId
     ) {
         if (targetStep > BoardConstants.LAST_RING_STEP) {
-            return new DestinationResolution(moveToStep(movingPiece, targetStep), null, false, true);
+            return new DestinationResolution(moveToStep(movingPiece, targetStep), null);
         }
         int targetCell = BoardCoordinates.toGlobalCell(movingPiece.color(), targetStep);
         PieceLocation occupant = findRingOccupant(participants, targetCell, excludedPieceId);
-        if (occupant != null && occupant.piece().shielded()) {
-            replacePiece(participants, occupant, withShield(occupant.piece(), false));
-            return new DestinationResolution(movingPiece, null, true, false);
-        }
         String capturedPieceId = null;
         if (occupant != null) {
             capturedPieceId = occupant.piece().pieceId();
@@ -511,9 +442,7 @@ public final class GameEngine {
         }
         return new DestinationResolution(
                 moveToStep(movingPiece, targetStep),
-                capturedPieceId,
-                false,
-                true
+                capturedPieceId
         );
     }
 
@@ -803,9 +732,7 @@ public final class GameEngine {
 
     private record DestinationResolution(
             PieceDto piece,
-            String capturedPieceId,
-            boolean shieldConsumed,
-            boolean landed
+            String capturedPieceId
     ) {
     }
 }

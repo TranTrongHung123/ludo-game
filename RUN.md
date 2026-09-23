@@ -41,8 +41,7 @@ Bật đủ tám scene Login, Register, Lobby, Room, Game, Result, Ranking, Hist
 với Login đứng đầu. Mở nhiều instance player, mỗi instance đăng nhập tài khoản
 riêng; cũng có thể dùng một Editor Play Mode cùng một player.
 
-`ludo.ps1 client` vẫn chạy **JavaFX legacy**, không mở Unity. Để demo client hiện tại,
-dùng các bước Unity ở trên.
+Client được chạy/build bằng Unity; Maven chỉ quản lý backend Java.
 
 ## Build và kiểm tra
 
@@ -70,7 +69,7 @@ Editor không ở Play Mode, dùng TCP fixture localhost, không cần Java/MySQ
 ## Các lệnh khác
 
 ```powershell
-.\ludo.ps1 build    # Build module Java, gồm client legacy; không build Unity
+.\ludo.ps1 build    # Build common + server; không build Unity
 .\ludo.ps1 test     # Maven verify; không chạy test Unity
 .\ludo.ps1 status   # Xem trạng thái MySQL
 .\ludo.ps1 stop     # Dừng MySQL, giữ nguyên dữ liệu

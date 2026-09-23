@@ -32,6 +32,6 @@ class GameDtoInvariantTest {
     }
 
     private static PieceDto piece(PieceState state, int stepCount) {
-        return new PieceDto("piece-1", "player-1", PieceColor.RED, state, stepCount, false, false);
+        return new PieceDto("piece-1", "player-1", PieceColor.RED, state, stepCount);
     }
 }

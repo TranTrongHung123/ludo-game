@@ -1,6 +1,6 @@
 # Unity Client — client chính của Ludo Game
 
-Backend là Java 21 + TCP + MySQL; `../client/` là JavaFX legacy.
+Backend là Java 21 + TCP + MySQL; đây là client duy nhất của dự án.
 Rà soát mới nhất ngày 2026-09-22: [INTEGRATION_REVIEW.md](../INTEGRATION_REVIEW.md).
 Các số liệu kiểm tra theo từng màn phía dưới là ghi nhận lịch sử, không phải tất cả
 đã được chạy lại trên Editor hiện tại. Sau sửa lỗi, đã đạt 23 kiểm tra hồi quy và
@@ -286,3 +286,31 @@ Giới hạn kiểm thử:
 - Chưa chạy end-to-end với Java/MySQL thật; chưa build desktop player trong đợt này.
 
 Xem [báo cáo tích hợp](../INTEGRATION_REVIEW.md) cho cách tái hiện và checklist kiểm thử.
+
+## Ô đặc biệt — 2026-09-23
+
+Bàn cờ có 16 ô: SPEED (+2 bước), SLOW (lùi ngay 2 bước), LUCKY (+1 lần tung),
+TRAP (về chuồng). Bỏ Khiên và trạng thái làm chậm lượt sau. BoardView chỉ render
+`specialCells` và `stepCount` do Server gửi; reconnect cũng dùng snapshot này.
+Cập nhật Server/client cùng phiên bản; contract bỏ `slowed`, `shielded`, `shieldConsumed`.
+
+Kiểm chứng: Unity 6000.6.2f1 compile thành công, Console không lỗi/cảnh báo.
+`VerifySpecialCells.Main` đạt 39 kiểm tra Edit Mode trên prefab thật (ký hiệu 16 ô,
+ô Khiên cũ thành ô thường, vị trí bốn màu sau lùi/về chuồng/ra lại/về đích,
+snapshot thay layout và chú giải). `VerifyIntegrationFixes.Main` đạt 23 kiểm tra hồi quy.
+Chưa chạy end-to-end Unity với Java/MySQL hoặc build desktop player cho thay đổi này.
+
+## Animation và ngựa về đích — 2026-09-23
+
+- Đọc `GameState.lastMove` do Server gửi để animate riêng chặng xúc xắc và chặng +2/−2.
+  Dừng nhấn hiệu ứng khoảng 0,38 giây; có nhãn +2/−2/+1/! tại quân.
+- Bẫy đi tới ô kích hoạt rồi về chuồng; +2/−2 bị chặn có thông báo riêng.
+- Ngựa hoàn thành chạm tâm đích, nhấn sáng rồi chuyển lên khay màu có vương miện và bộ đếm.
+- `BoardNotice` tự tắt trong khoảng 2,6 giây, không bắt xác nhận hoặc chặn chuột.
+- Reconnect/hụt snapshot đặt lại đúng vị trí, không phát lại animation/thông báo cũ.
+  UI refresh giữ animation đang chạy; Result chờ hoàn tất trình diễn cuối trận.
+- Authoring: `PolishMovePresentation.Main`, cập nhật đúng prefab hiện có.
+- Kiểm chứng: `VerifyMovePresentation.Main` đạt **66 kiểm tra Play Mode**;
+  `VerifyGame.Main(false)` đạt **61 kiểm tra TCP localhost**. Engine/JSON/room Java đạt.
+- [Ảnh xem trước](Documentation/move-presentation-preview.png) dùng fixture hiển thị,
+  không phải dữ liệu trận thật. Chưa kiểm thử end-to-end Unity + Java/MySQL trong đợt này.

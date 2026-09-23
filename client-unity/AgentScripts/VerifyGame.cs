@@ -67,10 +67,10 @@ public static class VerifyGame
         var members=new JArray();
         for(int s=0;s<4;s++)
         {
-            var pieces=new JArray();for(int i=0;i<4;i++)pieces.Add(new JObject{["pieceId"]="p"+s+"-"+i,["ownerPlayerId"]="p"+s,["color"]=BoardGeometry.Colors[s],["state"]="IN_YARD",["stepCount"]=-1,["slowed"]=false,["shielded"]=false});
+            var pieces=new JArray();for(int i=0;i<4;i++)pieces.Add(new JObject{["pieceId"]="p"+s+"-"+i,["ownerPlayerId"]="p"+s,["color"]=BoardGeometry.Colors[s],["state"]="IN_YARD",["stepCount"]=-1});
             members.Add(new JObject{["playerId"]="p"+s,["displayName"]=new[]{"Người kiểm thử","Bạn xanh dương","Bạn vàng","Bạn xanh lá"}[s],["slotIndex"]=s,["color"]=BoardGeometry.Colors[s],["presenceState"]="PLAYING",["matchStatus"]="ACTIVE",["rank"]=null,["scoreEarned"]=0,["pieces"]=pieces});
         }
-        var specials=new JArray();for(int s=0;s<4;s++)for(int i=0;i<5;i++)specials.Add(new JObject{["globalIndex"]=s*12+2+i*2,["type"]=new[]{"SPEED","SLOW","LUCKY","TRAP","SHIELD"}[i]});
+        var specials=new JArray();for(int s=0;s<4;s++)for(int i=0;i<4;i++)specials.Add(new JObject{["globalIndex"]=s*12+2+i*2,["type"]=new[]{"SPEED","SLOW","LUCKY","TRAP"}[i]});
         return new JObject{["roomId"]="fixture-room",["matchId"]="fixture-match",["roomState"]="PLAYING",["currentPlayerId"]="p0",["currentSlot"]=0,["turnState"]="WAITING_FOR_ROLL",["diceValue"]=null,["validPieceIds"]=new JArray(),["phaseDurationMillis"]=8000,["serverDeadlineEpochMillis"]=Now+8000,["participants"]=members,["specialCells"]=specials,["stateVersion"]=1};
     }
     static async Task Send(JObject message)
@@ -104,7 +104,7 @@ public static class VerifyGame
                             await Task.Delay(250);response["type"]="MOVE_PIECE_RESULT";
                             if(rejectMove){response["type"]="ERROR";response["success"]=false;response["error"]=new JObject{["code"]="INVALID_MOVE"};break;}
                             state["stateVersion"]=(long)state["stateVersion"]+1;state["participants"][0]["pieces"][0]["stepCount"]=0;state["participants"][0]["pieces"][0]["state"]="ON_TRACK";state["turnState"]="WAITING_FOR_ROLL";state["validPieceIds"]=new JArray();state["phaseDurationMillis"]=8000;state["serverDeadlineEpochMillis"]=Now+8000;
-                            response["data"]=new JObject{["piece"]=state["participants"][0]["pieces"][0].DeepClone(),["gameState"]=state.DeepClone(),["bonusRoll"]=true,["shieldConsumed"]=false};break;
+                            response["data"]=new JObject{["piece"]=state["participants"][0]["pieces"][0].DeepClone(),["gameState"]=state.DeepClone(),["bonusRoll"]=true};break;
                         case "RECONNECT":reconnects++;response["type"]="RECONNECT_RESULT";response["data"]=new JObject{["restored"]=true,["room"]=room.DeepClone(),["gameState"]=state.DeepClone(),["gameOver"]=savedResult?.DeepClone()};break;
                         case "READY":
                             readyRequests++;wire&=(string)request["data"]?["roomId"]=="fixture-room"&&(bool?)request["data"]?["ready"]==true;

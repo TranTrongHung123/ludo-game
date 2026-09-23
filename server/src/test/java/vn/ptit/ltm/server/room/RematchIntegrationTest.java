@@ -69,9 +69,9 @@ class RematchIntegrationTest {
             assertNotEquals(oldMatch, next.matchId());
             assertEquals("1", next.currentPlayerId());
             assertEquals(TurnState.WAITING_FOR_ROLL, next.turnState());
-            assertEquals(20, next.specialCells().size());
+            assertEquals(16, next.specialCells().size());
             assertTrue(next.participants().stream().flatMap(p -> p.pieces().stream()).allMatch(p ->
-                    p.state() == PieceState.IN_YARD && p.stepCount() == -1 && !p.slowed() && !p.shielded()));
+                    p.state() == PieceState.IN_YARD && p.stepCount() == -1));
         }
     }
 

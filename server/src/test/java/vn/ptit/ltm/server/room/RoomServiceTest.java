@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -396,7 +397,7 @@ class RoomServiceTest {
             assertEquals(120_000L, game.phaseDurationMillis());
             assertEquals(clock.instant().toEpochMilli() + 120_000L, game.serverDeadlineEpochMillis());
             assertEquals(2, game.participants().size());
-            assertEquals(20, game.specialCells().size());
+            assertEquals(16, game.specialCells().size());
             assertTrue(game.participants().stream().allMatch(participant ->
                     participant.pieces().size() == 4
                             && participant.pieces().stream().allMatch(piece -> piece.stepCount() == -1)
@@ -566,6 +567,9 @@ class RoomServiceTest {
                         afterReconnect.validPieceIds().getFirst()
                 );
                 assertEquals(0, moved.piece().stepCount());
+                assertEquals(-1, moved.gameState().lastMove().fromStep());
+                assertEquals(0, moved.gameState().lastMove().landedStep());
+                assertEquals(moved.gameState().lastMove(), rooms.gameForPlayer(second.user().id()).orElseThrow().lastMove());
             }
         }
     }
@@ -710,6 +714,7 @@ class RoomServiceTest {
 
                 rooms.rollDice(host.sessionId(), host.connectionId(), roomId);
                 clock.advance(Duration.ofMillis(119_999));
+                assertNull(rooms.gameForPlayer(host.user().id()).orElseThrow().lastMove());
                 rooms.processExpiredTurns();
                 assertEquals(TurnState.WAITING_FOR_MOVE,
                         rooms.gameForPlayer(host.user().id()).orElseThrow().turnState());
