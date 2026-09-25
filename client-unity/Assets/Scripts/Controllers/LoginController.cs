@@ -29,6 +29,7 @@ namespace Ludo.Controllers
 
         private async void Start()
         {
+            AudioManager.EnsureInstance();
             session = NetworkSession.Instance;
             if (session == null) { Feedback("Chưa cấu hình kết nối Game Server.", true); loginButton.interactable = false; return; }
             loginButton.onClick.AddListener(Submit);
@@ -73,6 +74,7 @@ namespace Ludo.Controllers
         public async void Submit()
         {
             if (pending || session == null || session.SessionId != null) return;
+            Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick);
             string error = Validate(usernameField.text, passwordField.text);
             if (error != null) { Feedback(error, true); return; }
             string host = serverHostField.text.Trim();
@@ -93,6 +95,7 @@ namespace Ludo.Controllers
                 passwordField.text = "";
                 if (session.SessionId != null)
                 {
+                    Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.Confirm);
                     if (Application.CanStreamedLevelBeLoaded(lobbyScene)) SceneManager.LoadScene(lobbyScene);
                     else Feedback("Đăng nhập thành công. Sảnh chơi sẽ được bổ sung ở bước tiếp theo.", false);
                 }
@@ -124,6 +127,7 @@ namespace Ludo.Controllers
 
         public void TogglePassword()
         {
+            Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick);
             bool reveal = passwordField.contentType == TMP_InputField.ContentType.Password;
             passwordField.contentType = reveal ? TMP_InputField.ContentType.Standard : TMP_InputField.ContentType.Password;
             visibilityLabel.text = reveal ? "Ẩn" : "Hiện";
@@ -134,6 +138,7 @@ namespace Ludo.Controllers
         private void OpenRegister()
         {
             if (pending || session == null || session.SessionId != null) return;
+            Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick);
             session.AuthUsername = usernameField.text;
             session.AuthNotice = "";
             if (Application.CanStreamedLevelBeLoaded(registerScene)) SceneManager.LoadScene(registerScene);
@@ -143,6 +148,7 @@ namespace Ludo.Controllers
         private async void Retry()
         {
             if (session == null || pending || session.State == ConnectionState.Connecting) return;
+            Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick);
             string host = serverHostField.text.Trim();
             if (Uri.CheckHostName(host) == UriHostNameType.Unknown || !int.TryParse(serverPortField.text, out int port) || port < 1 || port > 65535)
             { Feedback("Nhập IP/tên máy chủ hợp lệ và port từ 1 đến 65535.", true); return; }
@@ -174,6 +180,7 @@ namespace Ludo.Controllers
         {
             feedbackLabel.text = message;
             feedbackLabel.color = error ? new Color32(185, 58, 78, 255) : new Color32(91, 77, 143, 255);
+            if (error) Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ErrorSoft);
         }
 
         private void OnDestroy()

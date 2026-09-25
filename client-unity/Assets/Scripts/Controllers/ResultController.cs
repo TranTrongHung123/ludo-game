@@ -35,6 +35,8 @@ namespace Ludo.Controllers
             ConnectionChanged(session.State);
         }
 
+        private bool soundPlayed;
+
         private void Render()
         {
             var result = session.GameOver;
@@ -43,6 +45,23 @@ namespace Ludo.Controllers
             var own = standings.FirstOrDefault(p => (string)p["playerId"] == self);
             headline.text = own == null ? "Trận đấu đã kết thúc" : (string)own["matchStatus"] == "FORFEITED"
                 ? "Bạn đã bỏ cuộc • Hạng " + own["rank"] : "Bạn về hạng " + own["rank"] + "!";
+            if (!soundPlayed && own != null)
+            {
+                soundPlayed = true;
+                if ((string)own["matchStatus"] == "FORFEITED")
+                {
+                    Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.Forfeit);
+                }
+                else if ((int?)own["rank"] == 1)
+                {
+                    Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.Victory);
+                    Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.HorseNeigh);
+                }
+                else
+                {
+                    Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.Notification);
+                }
+            }
             matchId.text = "Mã trận  •  " + (string)result?["matchId"];
             count.text = standings.Length + " người chơi";
             emptyState.SetActive(standings.Length == 0);
@@ -77,6 +96,7 @@ namespace Ludo.Controllers
         public async void ReturnToLobby()
         {
             if (leaving || replaying || navigating || session?.State != ConnectionState.Connected) return;
+            Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick);
             if (session.Room == null) { Go("LobbyScene"); return; }
             leaving = true; RefreshAction(); feedback.text = "Đang rời phòng và trở về sảnh...";
             try
@@ -86,6 +106,7 @@ namespace Ludo.Controllers
             }
             catch (Exception e)
             {
+                Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ErrorSoft);
                 if (this != null && !navigating)
                     feedback.text = e is ServerRequestException ? "Chưa thể rời phòng. Vui lòng thử lại." : "Kết nối gián đoạn. Vui lòng thử lại khi kết nối được khôi phục.";
             }
@@ -95,6 +116,7 @@ namespace Ludo.Controllers
         public async void PlayAgain()
         {
             if (leaving || replaying || navigating || session?.State != ConnectionState.Connected || session.Room == null) return;
+            Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.Confirm);
             replaying = true; RefreshAction(); feedback.text = "Đang chuẩn bị ván mới...";
             try
             {

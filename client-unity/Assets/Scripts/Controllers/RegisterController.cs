@@ -68,6 +68,7 @@ namespace Ludo.Controllers
         public async void Submit()
         {
             if (pending || completed || session == null || session.SessionId != null) return;
+            Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick);
             string error = Validate(usernameField.text, displayNameField.text, passwordField.text, confirmPasswordField.text);
             if (error != null) { Feedback(error, true); return; }
             if (session.State != ConnectionState.Connected) { Feedback("Vui lòng kết nối Game Server trước.", true); return; }
@@ -83,6 +84,7 @@ namespace Ludo.Controllers
                 if ((bool)result["success"])
                 {
                     completed = true;
+                    Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.Confirm);
                     session.AuthUsername = username;
                     session.AuthNotice = "Đăng ký thành công. Bạn có thể đăng nhập ngay.";
                     if (Application.CanStreamedLevelBeLoaded(loginScene)) SceneManager.LoadScene(loginScene);
@@ -114,6 +116,7 @@ namespace Ludo.Controllers
 
         public void TogglePassword()
         {
+            Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick);
             bool reveal = passwordField.contentType == TMP_InputField.ContentType.Password;
             foreach (var field in new[] { passwordField, confirmPasswordField })
             {
@@ -126,13 +129,14 @@ namespace Ludo.Controllers
         public void OpenLogin()
         {
             if (pending || session == null) return;
+            Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick);
             session.AuthUsername = usernameField.text;
             ClearPasswords();
             if (Application.CanStreamedLevelBeLoaded(loginScene)) SceneManager.LoadScene(loginScene);
             else Feedback("Chưa tìm thấy màn hình đăng nhập.", true);
         }
         private void ClearPasswords() { passwordField.text = ""; confirmPasswordField.text = ""; }
-        private async void Retry() { if (session != null) await session.ConnectAsync(); }
+        private async void Retry() { Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick); if (session != null) await session.ConnectAsync(); }
         private void RenderConnection(ConnectionState state)
         {
             connectionLabel.text = state == ConnectionState.Connected ? "Đã kết nối Game Server" :
@@ -155,6 +159,7 @@ namespace Ludo.Controllers
         {
             feedbackLabel.text = message;
             feedbackLabel.color = error ? new Color32(185, 58, 78, 255) : new Color32(91, 77, 143, 255);
+            if (error) Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ErrorSoft);
         }
         private void OnDestroy() { if (session != null) session.StateChanged -= RenderConnection; }
     }

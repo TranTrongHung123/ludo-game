@@ -24,7 +24,12 @@ namespace Ludo.Views
             for (int i = 0; i < pips.Length; i++) pips[i].SetActive(value >= 1 && value <= 6 && visible[i]);
         }
         public void Animate(int value)
-        { result = value; if (bounceRoutine != null) StopCoroutine(bounceRoutine); bounceRoutine = StartCoroutine(Bounce()); }
+        {
+            result = value;
+            Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.DiceRoll);
+            if (bounceRoutine != null) StopCoroutine(bounceRoutine);
+            bounceRoutine = StartCoroutine(Bounce());
+        }
         private IEnumerator Bounce()
         {
             for (float t = 0; t < 1; t += Time.unscaledDeltaTime / .8f)

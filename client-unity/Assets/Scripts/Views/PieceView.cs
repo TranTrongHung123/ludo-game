@@ -26,7 +26,11 @@ namespace Ludo.Views
             body.color = Color.clear;
             horse.color = BoardGeometry.Tints[slot];
             number.gameObject.SetActive(false);
-            button.onClick.RemoveAllListeners(); button.onClick.AddListener(() => select(id));
+            button.onClick.RemoveAllListeners(); button.onClick.AddListener(() =>
+            {
+                Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick);
+                select(id);
+            });
             if (step == previousStep && move == null) { if (!IsAnimating) Rest(); return; }
             int from = previousStep;
             Snap();
@@ -72,9 +76,17 @@ namespace Ludo.Views
         private IEnumerator Move(int slot, int index, int from, int landed, int to, string triggered, System.Action<string> notify)
         {
             transform.SetAsLastSibling();
-            if (from < 0) yield return Hop(BoardGeometry.PathPosition(slot, landed, index), .25f);
+            if (from < 0)
+            {
+                Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.HorseSpawn);
+                Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.HorseNeigh);
+                yield return Hop(BoardGeometry.PathPosition(slot, landed, index), .25f);
+            }
             else for (int step = from + 1; step <= landed; step++)
+            {
+                Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.HorseStep);
                 yield return Hop(BoardGeometry.PathPosition(slot, step, index), .13f);
+            }
             string message = EffectMessage(triggered, landed == to);
             if (message != null)
             {
@@ -83,17 +95,31 @@ namespace Ludo.Views
                 if (bonusRollIcon != null) bonusRollIcon.SetActive(triggered == "LUCKY");
                 effect.gameObject.SetActive(true);
                 halo.gameObject.SetActive(true); halo.color = triggered == "SLOW" || triggered == "TRAP" ? new Color32(244,132,143,255) : new Color32(239,201,91,255);
+
+                if (triggered == "SPEED")
+                {
+                    Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.SpecialPlus3);
+                    Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.HorseGallop);
+                }
+                else if (triggered == "SLOW") Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.SpecialMinus1);
+                else if (triggered == "LUCKY") Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.BonusRoll);
+                else if (triggered == "TRAP") Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.Trap);
+
                 yield return Pulse(.38f);
                 if (to < 0) yield return Hop(BoardGeometry.Yard(slot, index), .4f);
                 else if (to != landed)
                 {
                     int direction = to > landed ? 1 : -1;
                     for (int step = landed + direction; step != to + direction; step += direction)
+                    {
+                        Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.HorseStep);
                         yield return Hop(BoardGeometry.PathPosition(slot, step, index), .19f);
+                    }
                 }
             }
             if (to == 53)
             {
+                Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.PieceFinished);
                 effect.gameObject.SetActive(false);
                 halo.gameObject.SetActive(true); halo.color = new Color32(239,201,91,255);
                 notify?.Invoke("Ngựa " + (index + 1) + " đã về đích!");

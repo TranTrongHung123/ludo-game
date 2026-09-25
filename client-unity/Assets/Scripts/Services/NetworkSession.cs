@@ -128,7 +128,22 @@ namespace Ludo.Services
             return response; // Registration does not authenticate or create a local session.
         }
 
-        private void SetState(ConnectionState state) { State = state; StateChanged?.Invoke(state); }
+        private void SetState(ConnectionState state)
+        {
+            if (State != state)
+            {
+                if (state == ConnectionState.Connected)
+                {
+                    AudioManager.Instance?.PlaySfx(SfxClip.ServerConnected);
+                }
+                else if (state == ConnectionState.Disconnected && State == ConnectionState.Connected)
+                {
+                    AudioManager.Instance?.PlaySfx(SfxClip.ServerDisconnected);
+                }
+            }
+            State = state;
+            StateChanged?.Invoke(state);
+        }
 
         private void RestoreSnapshot(JObject data)
         {

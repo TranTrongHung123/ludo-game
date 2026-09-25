@@ -23,6 +23,7 @@ namespace Ludo.Controllers
         private NetworkSession session;
         private bool busy, navigating, refreshing;
         private string selected;
+        private int lastPlayerCount = -1;
         private string SelfId => (string)session?.Profile?["playerId"];
         private JArray Players => session?.Room?["players"] as JArray ?? new JArray();
         private JObject Self => Players.OfType<JObject>().FirstOrDefault(p => (string)p["playerId"] == SelfId);
@@ -35,6 +36,7 @@ namespace Ludo.Controllers
             players.All(p => (bool?)p["ready"] == true && (string)p["presenceState"] == "IN_ROOM");
         private void Start()
         {
+            AudioManager.EnsureInstance();
             session = NetworkSession.Instance;
             if (session?.SessionId == null) { Go("LoginScene"); return; }
             if (session.Room == null) { Go("LobbyScene"); return; }
@@ -60,6 +62,12 @@ namespace Ludo.Controllers
             if (navigating) return;
             if (session.Room == null) { Go("LobbyScene"); return; }
             var players = Players.OfType<JObject>().ToArray();
+            if (lastPlayerCount >= 0)
+            {
+                if (players.Length > lastPlayerCount) Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.PlayerJoin);
+                else if (players.Length < lastPlayerCount) Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.PlayerLeave);
+            }
+            lastPlayerCount = players.Length;
             string host = (string)session.Room["hostPlayerId"];
             roomCode.text = (string)session.Room["roomId"];
             hostName.text = "Chủ phòng: " + ((string)players.FirstOrDefault(p => (string)p["playerId"] == host)?["displayName"] ?? "—");
@@ -87,20 +95,25 @@ namespace Ludo.Controllers
             }
         }
         private void SelectPlayer(string id) { selected = id; Render(); }
-        public void CopyCode() { if (session?.Room != null) { GUIUtility.systemCopyBuffer = (string)session.Room["roomId"]; Notice("Đã sao chép mã phòng.", false); } }
-        public void ToggleReady() { if (CanAct) _ = Execute(() => session.SetReadyAsync((bool?)Self["ready"] != true), "Đã cập nhật trạng thái sẵn sàng."); }
-        public void Leave() { if (CanAct) _ = Execute(session.LeaveRoomAsync, "Đã rời phòng."); }
-        public void StartMatch() { if (CanAct && CanStart(session.Room, SelfId)) _ = Execute(session.StartGameAsync, "Server đã bắt đầu trận."); }
+        public void CopyCode() { if (session?.Room != null) { Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick); GUIUtility.systemCopyBuffer = (string)session.Room["roomId"]; Notice("Đã sao chép mã phòng.", false); } }
+        public void ToggleReady() { if (CanAct) { Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.Ready); _ = Execute(() => session.SetReadyAsync((bool?)Self["ready"] != true), "Đã cập nhật trạng thái sẵn sàng."); } }
+        public void Leave() { if (CanAct) { Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick); _ = Execute(session.LeaveRoomAsync, "Đã rời phòng."); } }
+        public void StartMatch() { if (CanAct && CanStart(session.Room, SelfId)) { Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.GameStart); _ = Execute(session.StartGameAsync, "Server đã bắt đầu trận."); } }
         public void Invite(string id)
         {
             if (!CanInvite || id == null || !session.OnlinePlayers.Any(p => (string)p["playerId"] == id && (string)p["presenceState"] == "IDLE")) return;
+            Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.Confirm);
             _ = Execute(() => session.InvitePlayerAsync(id), "Đã gửi lời mời. Lời mời có hiệu lực 60 giây.");
         }
         private async Task Execute(Func<Task> action, string success)
         {
             busy = true; Render(); Notice("Đang xử lý...", false);
             try { await action(); if (this != null && !navigating) Notice(success, false); }
-            catch (Exception e) { if (this != null) Notice(Error(e), true); }
+            catch (Exception e)
+            {
+                Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ErrorSoft);
+                if (this != null) Notice(Error(e), true);
+            }
             finally { if (this != null && !navigating) { busy = false; Render(); } }
         }
         private static string Error(Exception e)

@@ -29,6 +29,7 @@ namespace Ludo.Controllers
 
         private void Start()
         {
+            AudioManager.EnsureInstance();
             session = NetworkSession.Instance;
             if (session == null || session.SessionId == null || session.Profile == null) { SceneManager.LoadScene("LoginScene"); return; }
             welcome.text = "Xin chào, " + ((string)session.Profile["displayName"] ?? (string)session.Profile["username"]) + "!";
@@ -58,6 +59,7 @@ namespace Ludo.Controllers
         public async void Refresh()
         {
             if (refreshing || navigating || session == null || session.State != ConnectionState.Connected) return;
+            Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick);
             refreshing = true; Controls(); empty.text = "Đang tải danh sách người chơi...";
             try { await session.RefreshOnlineAsync(); if (this != null) { empty.text = "Chưa có người chơi trực tuyến."; Render(); } }
             catch (Exception e) { if (this != null) { empty.text = "Chưa tải được danh sách. Hãy thử làm mới."; Notice(Error(e), true); } }
@@ -99,21 +101,30 @@ namespace Ludo.Controllers
             var invite = session.Invitation;
             long remaining = invite == null ? 0 : ((long?)invite["expiresAtEpochMillis"] ?? 0) - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             bool visible = invite != null && remaining > 0 && session.Room == null;
+            if (visible && !invitationCard.activeSelf)
+            {
+                Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.RoomInvite);
+            }
             invitationCard.SetActive(visible);
             if (visible) invitationText.text = (string)invite["inviterDisplayName"] + " mời bạn vào phòng\n" + (string)invite["roomId"] + "\nCòn " + Math.Ceiling(remaining / 1000d) + " giây để phản hồi";
             Controls();
         }
-        public void CreateRoom() { if (Available()) _ = RoomAction("CREATE_ROOM", null); }
+        public void CreateRoom() { if (Available()) { Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick); _ = RoomAction("CREATE_ROOM", null); } }
         public void JoinRoom()
         {
             if (!Available()) return;
             string code = roomCode.text.Trim();
             if (code.Length == 0) { Notice("Vui lòng nhập mã phòng.", true); return; }
+            Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick);
             _ = RoomAction("JOIN_ROOM", code);
         }
         public void AcceptInvitation()
         {
-            if (Available() && invitationCard.activeSelf) _ = RoomAction("ACCEPT_INVITE", (string)session.Invitation["invitationId"]);
+            if (Available() && invitationCard.activeSelf)
+            {
+                Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.Confirm);
+                _ = RoomAction("ACCEPT_INVITE", (string)session.Invitation["invitationId"]);
+            }
         }
         private async Task RoomAction(string type, string value)
         {
@@ -130,6 +141,7 @@ namespace Ludo.Controllers
         public async void RejectInvitation()
         {
             if (!Available() || !invitationCard.activeSelf) return;
+            Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick);
             string id = (string)session.Invitation["invitationId"];
             busy = true; Controls();
             try { await session.RejectInvitationAsync(id); if (this != null) Notice("Đã từ chối lời mời.", false); }
@@ -139,13 +151,14 @@ namespace Ludo.Controllers
         public async void Logout()
         {
             if (busy || session == null || session.State != ConnectionState.Connected) return;
+            Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick);
             busy = true; Controls(); Notice("Đang đăng xuất...", false);
             try { await session.LogoutAsync(); if (this != null) { navigating = true; SceneManager.LoadScene("LoginScene"); } }
             catch (Exception e) { if (this != null) Notice(Error(e), true); }
             finally { if (this != null) { busy = false; Controls(); } }
         }
-        public void OpenRanking() => OpenDestination(rankingScene, "Bảng xếp hạng");
-        public void OpenHistory() => OpenDestination(historyScene, "Lịch sử trận đấu");
+        public void OpenRanking() { Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick); OpenDestination(rankingScene, "Bảng xếp hạng"); }
+        public void OpenHistory() { Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick); OpenDestination(historyScene, "Lịch sử trận đấu"); }
         private void OpenDestination(string scene, string title)
         {
             if (busy || navigating) return;

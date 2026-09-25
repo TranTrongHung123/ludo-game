@@ -28,6 +28,7 @@ namespace Ludo.Views
             label.richText = false; label.text = item.text; accent.color = item.color;
             elapsed = 0; showing = true;
             group.blocksRaycasts = false; group.interactable = false; group.alpha = 0;
+            Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.Notification);
         }
         private void Update()
         {

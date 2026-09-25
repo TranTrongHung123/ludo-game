@@ -126,3 +126,17 @@ build/
 Thumbs.db
 ehthumbs.db
 desktop.ini
+$RECYCLE.BIN/
+
+# ==============================================================================
+# Raw Audio Packs & Media Source Folders
+# ==============================================================================
+Ludo_Friendly_Audio_Pack/
+**/Ludo_Friendly_Audio_Pack/
+
+# ==============================================================================
+# Deprecated Modules & Scratch Directories
+# ==============================================================================
+client/
+**/Assets/Editor/AudioVerificationRunner*
+

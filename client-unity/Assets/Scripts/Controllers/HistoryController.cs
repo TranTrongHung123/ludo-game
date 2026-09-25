@@ -41,6 +41,7 @@ namespace Ludo.Controllers
         public async void Refresh()
         {
             if (loading || navigating || session?.State != ConnectionState.Connected) return;
+            Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick);
             loading = true; Controls();
             feedback.text = "Đang tải lịch sử trận đấu..."; feedback.color = new Color32(115,110,141,255);
             empty.text = "Đang tải lịch sử từ Server...";
@@ -63,6 +64,7 @@ namespace Ludo.Controllers
             catch (Exception)
             {
                 if (this == null || navigating) return;
+                Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ErrorSoft);
                 feedback.text = "Chưa tải được lịch sử. Vui lòng thử làm mới.";
                 feedback.color = new Color32(185,65,87,255); empty.text = "Chưa tải được dữ liệu. Hãy thử lại.";
             }
@@ -73,7 +75,11 @@ namespace Ludo.Controllers
             refreshButton.interactable = !loading && !navigating && session.State == ConnectionState.Connected;
             refreshLabel.text = loading ? "Đang tải..." : "Làm mới";
         }
-        public void Back() => Go("LobbyScene");
+        public void Back()
+        {
+            Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick);
+            Go("LobbyScene");
+        }
         private void Go(string scene) { if (navigating) return; navigating = true; SceneManager.LoadScene(scene); }
         private void OnDestroy()
         {

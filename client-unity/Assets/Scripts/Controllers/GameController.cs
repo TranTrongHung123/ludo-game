@@ -28,6 +28,8 @@ namespace Ludo.Controllers
         private bool busy, navigating, snap = true;
         private string selected;
         private long? awaitingStateVersion;
+        private string lastCurrentPlayerId;
+        private int lastCountdownSecond = -1;
         private JObject Game => session?.GameState;
         private string SelfId => (string)session?.Profile?["playerId"];
         private JToken Self => (Game?["participants"] as JArray)?.FirstOrDefault(p => (string)p["playerId"] == SelfId);
@@ -43,12 +45,13 @@ namespace Ludo.Controllers
         private bool CanAct(string state) => !busy && !navigating && !board.IsAnimating && awaitingStateVersion == null && !confirmation.activeSelf && Connected && MayAct(Game, SelfId, state, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
         private void Start()
         {
+            AudioManager.EnsureInstance();
             session = NetworkSession.Instance;
             if (session?.SessionId == null) { Go("LoginScene"); return; }
             if (Game == null) { Go(session.Room == null ? "LobbyScene" : "RoomScene"); return; }
             rollButton.onClick.AddListener(Roll); moveButton.onClick.AddListener(Move);
             leaveButton.onClick.AddListener(Leave); confirmButton.onClick.AddListener(ConfirmLeave);
-            cancelButton.onClick.AddListener(() => { confirmation.SetActive(false); Render(); });
+            cancelButton.onClick.AddListener(() => { Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick); confirmation.SetActive(false); Render(); });
             if (sendButton != null) sendButton.onClick.AddListener(SendChat);
             if (chatInput != null)
             {
@@ -61,6 +64,7 @@ namespace Ludo.Controllers
             }
             session.LobbyChanged += Render; session.StateChanged += ConnectionChanged; session.GameEvent += Event; session.ChatReceived += OnChatReceived;
             ConnectionChanged(session.State);
+            Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.GameStart);
         }
         private void ConnectionChanged(ConnectionState state)
         {
@@ -84,6 +88,11 @@ namespace Ludo.Controllers
             matchLabel.text = "Trận " + (string)Game["matchId"];
             var members = Game["participants"] as JArray ?? new JArray();
             string current = (string)Game["currentPlayerId"];
+            if (current == SelfId && lastCurrentPlayerId != SelfId && (string)Game["turnState"] != "FINISHED")
+            {
+                Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.TurnStart);
+            }
+            lastCurrentPlayerId = current;
             turnName.text = (string)Game["turnState"] == "FINISHED" ? "Trận đấu kết thúc" : (string)members.FirstOrDefault(p => (string)p["playerId"] == current)?["displayName"] ?? "Đang chờ";
             for (int i = 0; i < players.Length; i++) players[i].Bind(members.FirstOrDefault(p => (int?)p["slotIndex"] == i), i, SelfId, current);
             if (!(Game["validPieceIds"] as JArray ?? new JArray()).Values<string>().Contains(selected) || (string)Game["currentPlayerId"] != SelfId) selected = null;
@@ -109,7 +118,20 @@ namespace Ludo.Controllers
         {
             if (Game == null || navigating) return;
             long remaining = Math.Max(0, ((long?)Game["serverDeadlineEpochMillis"] ?? 0) - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
-            timer.text = Game["serverDeadlineEpochMillis"]?.Type == JTokenType.Integer ? ((remaining + 999) / 1000) + "s" : "—";
+            long remainingSec = (remaining + 999) / 1000;
+            timer.text = Game["serverDeadlineEpochMillis"]?.Type == JTokenType.Integer ? remainingSec + "s" : "—";
+            if ((string)Game["currentPlayerId"] == SelfId && (string)Game["roomState"] == "PLAYING" && remainingSec <= 5 && remainingSec > 0)
+            {
+                if ((int)remainingSec != lastCountdownSecond)
+                {
+                    lastCountdownSecond = (int)remainingSec;
+                    Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.CountdownTick);
+                }
+            }
+            else
+            {
+                lastCountdownSecond = -1;
+            }
             long duration = (long?)Game["phaseDurationMillis"] ?? 0;
             timerFill.fillAmount = duration > 0 ? Mathf.Clamp01((float)remaining / duration) : 0;
             phase.text = (string)Game["turnState"] switch { "WAITING_FOR_ROLL" => "Chờ đổ xúc xắc", "WAITING_FOR_MOVE" => "Chọn quân để di chuyển", "FINISHED" => "Đã kết thúc", _ => "Đang xử lý" };
@@ -144,10 +166,12 @@ namespace Ludo.Controllers
         {
             try
             {
+                Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ChatSend);
                 await session.SendChatMessageAsync(text);
             }
             catch (Exception)
             {
+                Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ErrorSoft);
                 if (this != null && feedback != null) feedback.text = "Không thể gửi tin nhắn. Vui lòng thử lại.";
             }
         }
@@ -155,6 +179,11 @@ namespace Ludo.Controllers
         private void OnChatReceived(JObject data)
         {
             if (data == null) return;
+            string senderId = (string)data["senderPlayerId"];
+            if (senderId != SelfId)
+            {
+                Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ChatReceive);
+            }
             string senderName = EscapeChatText((string)data["senderDisplayName"] ?? "Người chơi");
             string color = (string)data["senderColor"] ?? "RED";
             string colorHex = color switch
@@ -207,15 +236,39 @@ namespace Ludo.Controllers
                 !(Self?["pieces"] as JArray ?? new JArray()).Any(p => (string)p["pieceId"] == id)) return;
             selected = id; Render();
         }
-        public void Roll() { if (CanAct("WAITING_FOR_ROLL")) { awaitingStateVersion = (long?)Game["stateVersion"]; _ = Execute(session.RollDiceAsync); } }
-        public void Move() { if (CanMove && selected != null) { awaitingStateVersion = (long?)Game["stateVersion"]; _ = Execute(() => session.MovePieceAsync(selected)); } }
+        public void Roll()
+        {
+            if (CanAct("WAITING_FOR_ROLL"))
+            {
+                Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick);
+                awaitingStateVersion = (long?)Game["stateVersion"];
+                _ = Execute(session.RollDiceAsync);
+            }
+        }
+        public void Move()
+        {
+            if (CanMove && selected != null)
+            {
+                Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick);
+                awaitingStateVersion = (long?)Game["stateVersion"];
+                _ = Execute(() => session.MovePieceAsync(selected));
+            }
+        }
         public void Leave()
         {
             if (busy || !Connected) return;
+            Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick);
             if (Active) { confirmation.SetActive(true); Render(); }
             else _ = Execute(LeaveAcknowledged);
         }
-        public void ConfirmLeave() { if (confirmation.activeSelf && !busy && Connected) _ = Execute(LeaveAcknowledged); }
+        public void ConfirmLeave()
+        {
+            if (confirmation.activeSelf && !busy && Connected)
+            {
+                Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.Forfeit);
+                _ = Execute(LeaveAcknowledged);
+            }
+        }
         private async Task LeaveAcknowledged() { await session.LeaveRoomAsync(); if (this != null) Go("LobbyScene"); }
         private async Task Execute(Func<Task> action)
         {
@@ -223,6 +276,7 @@ namespace Ludo.Controllers
             try { await action(); if (this != null && !navigating) feedback.text = "Đã cập nhật."; }
             catch (Exception e)
             {
+                Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ErrorSoft);
                 awaitingStateVersion = null;
                 if (this != null) feedback.text = e is ServerRequestException error ? error.Code switch
                 {

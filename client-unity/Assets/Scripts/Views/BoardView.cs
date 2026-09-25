@@ -25,6 +25,7 @@ namespace Ludo.Views
         {
             foreach (var piece in pieces.Values) if (piece != null) piece.Snap();
             if (notice != null) notice.Clear();
+            previousSteps.Clear();
             initialized = false;
         }
         private int ownSlot = -1;
@@ -37,6 +38,7 @@ namespace Ludo.Views
             ownYardHighlights[ownSlot].color = tint;
         }
         private readonly Dictionary<string, PieceView> pieces = new Dictionary<string, PieceView>();
+        private readonly Dictionary<string, int> previousSteps = new Dictionary<string, int>();
         private bool initialized;
         public void Bind(JObject state, string self, string selected, bool canMove, Action<string> select, bool animate)
         {
@@ -65,6 +67,7 @@ namespace Ludo.Views
             var valid = new HashSet<string>((state["validPieceIds"] as JArray ?? new JArray()).Values<string>());
             var visible = new HashSet<string>();
             if (finishCounts != null) foreach (var count in finishCounts) if (count != null) count.text = "VỀ ĐÍCH  0/4";
+            bool captured = false;
             foreach (var participant in state["participants"] as JArray ?? new JArray())
             {
                 if ((string)participant["matchStatus"] == "FORFEITED") continue;
@@ -79,11 +82,18 @@ namespace Ludo.Views
                     if (!pieces.TryGetValue(id, out var view)) pieces[id] = view = Instantiate(piecePrefab, pieceLayer);
                     visible.Add(id); view.gameObject.SetActive(true);
                     var pieceMove = (string)move?["pieceId"] == id ? move : null;
-                    view.Bind(id, slot, index++, (int)piece["stepCount"],
+                    int newStep = (int)piece["stepCount"];
+                    if (move != null && pieceMove == null && previousSteps.TryGetValue(id, out int oldStep) && oldStep >= 0 && newStep == -1)
+                    {
+                        captured = true;
+                    }
+                    previousSteps[id] = newStep;
+                    view.Bind(id, slot, index++, newStep,
                         canMove && (string)piece["ownerPlayerId"] == self && valid.Contains(id), id == selected, select, initialized && animate,
                         pieceMove, message => { if (notice != null) notice.Show(BoardGeometry.Names[slot] + " • " + message, BoardGeometry.Tints[slot]); });
                 }
             }
+            if (captured) Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.Capture);
             foreach (var item in pieces) if (!visible.Contains(item.Key)) item.Value.gameObject.SetActive(false);
             initialized = true;
         }
