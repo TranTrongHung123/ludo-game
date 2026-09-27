@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Exercises the public wire contract without any desktop client implementation. */
+// Kiểm tra contract TCP bằng client kiểm thử độc lập với giao diện game.
 class TcpWorkflowIntegrationTest {
     @Test
     void registerLoginLogout() throws Exception {

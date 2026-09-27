@@ -12,17 +12,20 @@ final class AuthValidator {
     private AuthValidator() {
     }
 
+    // Áp dụng kiểm tra username, mật khẩu và tên hiển thị trước khi lưu.
     static void validateRegistration(String username, String password, String displayName) {
         validateUsername(username);
         validatePassword(password);
         validateDisplayName(displayName);
     }
 
+    // Kiểm tra dữ liệu đăng nhập trước khi truy vấn tài khoản.
     static void validateLogin(String username, String password) {
         validateUsername(username);
         validatePassword(password);
     }
 
+    // Giới hạn độ dài và từ chối khoảng trắng ở hai đầu tên đăng nhập.
     private static void validateUsername(String username) {
         requireText(username, "Username");
         if (username.length() > MAX_USERNAME_LENGTH) {
@@ -33,6 +36,7 @@ final class AuthValidator {
         }
     }
 
+    // Kiểm tra độ dài mật khẩu theo byte UTF-8 phù hợp với BCrypt.
     private static void validatePassword(String password) {
         requireText(password, "Password");
         if (password.getBytes(StandardCharsets.UTF_8).length > MAX_BCRYPT_PASSWORD_BYTES) {
@@ -40,6 +44,7 @@ final class AuthValidator {
         }
     }
 
+    // Chặn tên hiển thị rỗng, quá dài hoặc có khoảng trắng ở hai đầu.
     private static void validateDisplayName(String displayName) {
         requireText(displayName, "Display name");
         if (displayName.length() > MAX_DISPLAY_NAME_LENGTH) {

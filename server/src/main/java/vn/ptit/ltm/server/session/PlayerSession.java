@@ -55,6 +55,7 @@ public final class PlayerSession {
         return connectionId != null;
     }
 
+    // Ghi thời điểm mất mạng, giữ presence cần khôi phục và tăng thế hệ kết nối.
     long markDisconnected(Instant now) {
         if (presenceState != PlayerPresenceState.DISCONNECTED) {
             resumePresenceState = presenceState;
@@ -65,6 +66,7 @@ public final class PlayerSession {
         return ++connectionGeneration;
     }
 
+    // Gắn connection mới và khôi phục presence trước khi mất mạng.
     void reconnect(String newConnectionId) {
         connectionId = Objects.requireNonNull(newConnectionId, "newConnectionId");
         presenceState = resumePresenceState;
@@ -81,6 +83,7 @@ public final class PlayerSession {
         resumePresenceState = newPresenceState;
     }
 
+    // Giữ DISCONNECTED khi mất mạng nhưng cập nhật trạng thái sẽ dùng khi reconnect.
     void updatePresenceForSystem(PlayerPresenceState newPresenceState) {
         if (newPresenceState == PlayerPresenceState.OFFLINE
                 || newPresenceState == PlayerPresenceState.DISCONNECTED) {
@@ -92,6 +95,7 @@ public final class PlayerSession {
         }
     }
 
+    // Thay thống kê trong hồ sơ phiên bằng dữ liệu đã được Server lưu.
     void updateStatistics(BigDecimal totalScore, int firstPlaceCount) {
         Objects.requireNonNull(totalScore, "totalScore");
         if (totalScore.signum() < 0 || firstPlaceCount < 0) {
@@ -110,6 +114,7 @@ public final class PlayerSession {
         );
     }
 
+    // Xóa liên kết connection và đánh dấu phiên không còn trực tuyến.
     void markOffline() {
         connectionId = null;
         presenceState = PlayerPresenceState.OFFLINE;
@@ -121,6 +126,7 @@ public final class PlayerSession {
         return connectionGeneration;
     }
 
+    // Chỉ xuất thông tin chẩn đoán không chứa mã phiên bí mật.
     @Override
     public String toString() {
         return "PlayerSession[sessionId=<redacted>, userId=" + user.id()

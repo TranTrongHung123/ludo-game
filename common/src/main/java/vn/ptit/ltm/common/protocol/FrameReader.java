@@ -8,6 +8,7 @@ import java.io.InputStream;
 import java.util.Objects;
 
 public final class FrameReader {
+    // Đọc đủ prefix và payload, kiểm tra giới hạn trước khi cấp phát từ độ dài do client gửi.
     public byte[] readFrame(InputStream input) throws IOException {
         Objects.requireNonNull(input, "input");
         DataInputStream dataInput = input instanceof DataInputStream stream

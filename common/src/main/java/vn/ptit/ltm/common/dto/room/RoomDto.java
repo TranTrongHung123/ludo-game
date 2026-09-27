@@ -13,6 +13,7 @@ public record RoomDto(
         RoomState state,
         List<RoomPlayerDto> players
 ) {
+    // Kiểm tra dữ liệu phòng và sao chép danh sách để snapshot không bị sửa bên ngoài.
     public RoomDto {
         Objects.requireNonNull(roomId, "roomId");
         Objects.requireNonNull(hostPlayerId, "hostPlayerId");

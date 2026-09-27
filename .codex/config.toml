@@ -1,7 +1,7 @@
 
 [mcp_servers.unity]
 command = "C:\\Users\\Acer\\AppData\\Local\\Unity\\bin\\unity.exe"
-args = ["mcp","--project-path","D:\\Projects\\ludo-game\\client-unity"]
+args = ["mcp","--project-path","D:\\Projects\\ludo-game\\client"]
 
 [mcp_servers.unity.tools.editor_status]
 approval_mode = "approve"

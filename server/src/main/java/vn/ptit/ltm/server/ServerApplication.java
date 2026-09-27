@@ -51,6 +51,7 @@ public final class ServerApplication implements AutoCloseable {
         this.tcpServer = tcpServer;
     }
 
+    // Khởi tạo database và kết nối các dịch vụ phiên, phòng, heartbeat với TCP Server.
     public static ServerApplication createDefault() {
         DatabaseManager database = DatabaseManager.initialize(DatabaseConfig.fromEnvironment());
         SessionManager sessions = new SessionManager();
@@ -103,15 +104,18 @@ public final class ServerApplication implements AutoCloseable {
         }
     }
 
+    // Bắt đầu lắng nghe TCP sau khi các dịch vụ đã khởi tạo.
     public void start() throws IOException {
         tcpServer.start();
         LOGGER.info("Ludo Game Server started on port {}", tcpServer.port());
     }
 
+    // Giữ tiến trình chính chờ tới khi Server được đóng.
     public void awaitTermination() throws InterruptedException {
         stopped.await();
     }
 
+    // Dừng các thành phần đúng một lần và giải phóng tài nguyên.
     @Override
     public void close() {
         if (!closed.compareAndSet(false, true)) {
@@ -126,6 +130,7 @@ public final class ServerApplication implements AutoCloseable {
         LOGGER.info("Ludo Game Server stopped");
     }
 
+    // Chạy Server và đăng ký dọn dẹp khi tiến trình nhận yêu cầu tắt.
     public static void main(String[] args) throws Exception {
         ServerApplication application = ServerApplication.createDefault();
         Thread shutdownHook = new Thread(application::close, "server-shutdown");
@@ -137,11 +142,12 @@ public final class ServerApplication implements AutoCloseable {
             try {
                 Runtime.getRuntime().removeShutdownHook(shutdownHook);
             } catch (IllegalStateException ignored) {
-                // The JVM is already shutting down and executing the hook.
+                // JVM đang tắt và đã thực thi tác vụ dọn dẹp.
             }
         }
     }
 
+    // Đọc số nguyên cấu hình và chặn giá trị ngoài giới hạn cho phép.
     private static int environmentInt(String name, int defaultValue, int minimum, int maximum) {
         String rawValue = System.getenv(name);
         if (rawValue == null || rawValue.isBlank()) {

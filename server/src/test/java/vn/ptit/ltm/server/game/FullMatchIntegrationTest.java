@@ -63,8 +63,8 @@ class FullMatchIntegrationTest {
             completedMoves++;
         }
 
-        // Canonical cascading stops as soon as only one ACTIVE participant remains.
-        // By then every earlier player finished four pieces and the final player finished three.
+        // Luật kết thúc sớm dừng trận ngay khi chỉ còn một participant ACTIVE.
+        // Các người chơi trước đã hoàn thành bốn quân; người cuối mới hoàn thành ba quân.
         assertEquals(playerCount * BoardConstants.PIECES_PER_PLAYER - 1, completedMoves);
         assertEquals(RoomState.FINISHED, game.roomState());
         assertEquals(TurnState.FINISHED, game.turnState());

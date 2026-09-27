@@ -7,11 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Bounded replay guard for request identifiers received on a TCP connection.
- * Entries only need to cover the retry horizon; gameplay state remains authoritative
- * and is never mutated twice by an immediate network replay.
- */
+// Nhớ requestId theo từng kết nối trong thời hạn giới hạn để chặn yêu cầu gửi lặp mà không tăng bộ nhớ vô hạn.
 final class RequestIdRegistry {
     static final int DEFAULT_MAX_ENTRIES = 16_384;
     static final Duration DEFAULT_RETENTION = Duration.ofMinutes(2);
@@ -38,6 +34,7 @@ final class RequestIdRegistry {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
+    // Từ chối requestId đã gặp trên cùng connection trong khoảng lưu giữ.
     synchronized boolean register(String connectionId, String requestId) {
         RequestKey key = new RequestKey(
                 Objects.requireNonNull(connectionId, "connectionId"),
@@ -54,6 +51,7 @@ final class RequestIdRegistry {
         return true;
     }
 
+    // Loại ID hết hạn trước khi kiểm tra yêu cầu mới.
     private void removeExpired(long now) {
         Iterator<Map.Entry<RequestKey, Long>> iterator = expiresAtByKey.entrySet().iterator();
         while (iterator.hasNext()) {
@@ -63,6 +61,7 @@ final class RequestIdRegistry {
         }
     }
 
+    // Bỏ ID cũ nhất khi đạt giới hạn để bộ nhớ chống gửi lặp không tăng vô hạn.
     private void trimToBound() {
         Iterator<RequestKey> iterator = expiresAtByKey.keySet().iterator();
         while (expiresAtByKey.size() > maxEntries && iterator.hasNext()) {

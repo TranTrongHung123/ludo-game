@@ -35,7 +35,7 @@ function Show-Help {
     Write-Host ""
     Write-Host "  .\ludo.ps1 db       Khoi dong MySQL"
     Write-Host "  .\ludo.ps1 server   Build va chay Game Server"
-    Write-Host "  Unity Client       Mo client-unity trong Unity Hub (xem RUN.md)"
+    Write-Host "  Unity Client       Mo client trong Unity Hub (xem RUN.md)"
     Write-Host "  .\ludo.ps1 build    Build Java backend (common + server)"
     Write-Host "  .\ludo.ps1 test     Chay Maven verify"
     Write-Host "  .\ludo.ps1 status   Xem trang thai MySQL"

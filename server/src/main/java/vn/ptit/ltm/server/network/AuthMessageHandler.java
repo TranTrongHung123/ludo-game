@@ -117,6 +117,7 @@ public final class AuthMessageHandler implements MessageHandler {
         this.messageFactory = new MessageFactory(codec.objectMapper());
     }
 
+    // Kiểm tra envelope, chặn request lặp, dispatch nghiệp vụ và ánh xạ lỗi thành response.
     @Override
     public void handle(ClientConnection connection, MessageEnvelope message) throws IOException {
         if (message.type() == MessageType.PONG) {
@@ -205,6 +206,7 @@ public final class AuthMessageHandler implements MessageHandler {
         }
     }
 
+    // Đọc payload đăng ký và trả hồ sơ mới mà không tạo phiên đăng nhập.
     private void handleRegister(ClientConnection connection, MessageEnvelope message)
             throws IOException {
         requireUnauthenticatedConnection(connection);
@@ -216,6 +218,7 @@ public final class AuthMessageHandler implements MessageHandler {
         ));
     }
 
+    // Xác thực tài khoản rồi trả token và hồ sơ qua connection gửi yêu cầu.
     private void handleLogin(ClientConnection connection, MessageEnvelope message)
             throws IOException {
         LoginRequest request = payloadMapper.fromTree(message.data(), LoginRequest.class);
@@ -226,6 +229,7 @@ public final class AuthMessageHandler implements MessageHandler {
         ));
     }
 
+    // Xử lý rời phòng và hủy phiên khi người dùng đăng xuất.
     private void handleLogout(ClientConnection connection, MessageEnvelope message) throws IOException {
         PlayerSession session = sessionManager.requireAuthenticated(message.sessionId(), connection.id());
         sessionManager.logout(message.sessionId(), connection.id());
@@ -239,6 +243,7 @@ public final class AuthMessageHandler implements MessageHandler {
         ));
     }
 
+    // Gắn lại phiên và trả snapshot khôi phục từ dịch vụ phòng.
     private void handleReconnect(ClientConnection connection, MessageEnvelope message)
             throws IOException {
         ReconnectRequest request = payloadMapper.fromTree(message.data(), ReconnectRequest.class);
@@ -251,6 +256,7 @@ public final class AuthMessageHandler implements MessageHandler {
         ));
     }
 
+    // Xác thực phiên rồi trả danh sách người chơi trực tuyến.
     private void handleGetOnlinePlayers(ClientConnection connection, MessageEnvelope message)
             throws IOException {
         sessionManager.requireAuthenticated(message.sessionId(), connection.id());
@@ -264,6 +270,7 @@ public final class AuthMessageHandler implements MessageHandler {
         ));
     }
 
+    // Trả bảng xếp hạng từ dữ liệu đã lưu cho người đã đăng nhập.
     private void handleGetRanking(ClientConnection connection, MessageEnvelope message)
             throws IOException {
         sessionManager.requireAuthenticated(message.sessionId(), connection.id());
@@ -278,6 +285,7 @@ public final class AuthMessageHandler implements MessageHandler {
         ));
     }
 
+    // Lấy lịch sử của tài khoản trong phiên, không nhận userId tùy ý từ client.
     private void handleGetMatchHistory(ClientConnection connection, MessageEnvelope message)
             throws IOException {
         PlayerSession session = sessionManager.requireAuthenticated(message.sessionId(), connection.id());
@@ -292,6 +300,7 @@ public final class AuthMessageHandler implements MessageHandler {
         ));
     }
 
+    // Tạo phòng cho phiên hiện tại rồi trả và broadcast trạng thái phòng.
     private void handleCreateRoom(ClientConnection connection, MessageEnvelope message)
             throws IOException {
         requireRoomService();
@@ -305,6 +314,7 @@ public final class AuthMessageHandler implements MessageHandler {
         roomService.broadcastRoom(room.roomId());
     }
 
+    // Ánh xạ mã phòng từ payload và thông báo membership mới.
     private void handleJoinRoom(ClientConnection connection, MessageEnvelope message)
             throws IOException {
         requireRoomService();
@@ -318,6 +328,7 @@ public final class AuthMessageHandler implements MessageHandler {
         roomService.broadcastRoom(room.roomId());
     }
 
+    // Chuyển yêu cầu rời phòng qua dịch vụ để áp dụng đúng luật bỏ cuộc.
     private void handleLeaveRoom(ClientConnection connection, MessageEnvelope message)
             throws IOException {
         requireRoomService();
@@ -332,6 +343,7 @@ public final class AuthMessageHandler implements MessageHandler {
         roomService.broadcastGameUpdated(request.roomId());
     }
 
+    // Tạo lời mời hợp lệ và gửi tới người nhận đang trực tuyến.
     private void handleInvitePlayer(ClientConnection connection, MessageEnvelope message)
             throws IOException {
         requireRoomService();
@@ -350,6 +362,7 @@ public final class AuthMessageHandler implements MessageHandler {
         ));
     }
 
+    // Tiêu thụ lời mời, tham gia phòng và thông báo trạng thái mới.
     private void handleAcceptInvite(ClientConnection connection, MessageEnvelope message)
             throws IOException {
         requireRoomService();
@@ -367,6 +380,7 @@ public final class AuthMessageHandler implements MessageHandler {
         roomService.broadcastRoom(room.roomId());
     }
 
+    // Xác nhận từ chối sau khi dịch vụ loại lời mời của đúng người nhận.
     private void handleRejectInvite(ClientConnection connection, MessageEnvelope message)
             throws IOException {
         requireRoomService();
@@ -383,6 +397,7 @@ public final class AuthMessageHandler implements MessageHandler {
         ));
     }
 
+    // Cập nhật Ready từ yêu cầu và gửi trạng thái phòng cho các thành viên.
     private void handleSetReady(
             ClientConnection connection,
             MessageEnvelope message,
@@ -407,6 +422,7 @@ public final class AuthMessageHandler implements MessageHandler {
         roomService.broadcastRoom(room.roomId());
     }
 
+    // Yêu cầu dịch vụ khởi tạo trận rồi gửi snapshot tới phòng.
     private void handleStartGame(ClientConnection connection, MessageEnvelope message)
             throws IOException {
         requireRoomService();
@@ -425,6 +441,7 @@ public final class AuthMessageHandler implements MessageHandler {
         roomService.broadcastGame(request.roomId());
     }
 
+    // Lấy xúc xắc từ Server và gửi cùng kết quả cho người yêu cầu và phòng.
     private void handleRollDice(ClientConnection connection, MessageEnvelope message)
             throws IOException {
         requireRoomService();
@@ -446,6 +463,7 @@ public final class AuthMessageHandler implements MessageHandler {
         }
     }
 
+    // Chuyển ý định chọn quân tới dịch vụ và gửi snapshot sau nước đi.
     private void handleMovePiece(ClientConnection connection, MessageEnvelope message)
             throws IOException {
         requireRoomService();
@@ -467,6 +485,7 @@ public final class AuthMessageHandler implements MessageHandler {
         }
     }
 
+    // Xử lý chat qua dịch vụ phòng trước khi phát tin nhắn cho thành viên.
     private void handleChatMessage(ClientConnection connection, MessageEnvelope message) throws IOException {
         requireRoomService();
         SendChatMessageRequest request = payloadMapper.fromTree(message.data(), SendChatMessageRequest.class);
@@ -490,12 +509,14 @@ public final class AuthMessageHandler implements MessageHandler {
         }
     }
 
+    // Chặn đăng ký hoặc đăng nhập mới trên connection đã có phiên.
     private void requireUnauthenticatedConnection(ClientConnection connection) {
         if (sessionManager.findByConnectionId(connection.id()).isPresent()) {
             throw new AuthException(ErrorCode.INVALID_REQUEST, "Connection is already authenticated");
         }
     }
 
+    // Yêu cầu mã tương quan để ghép response và phát hiện gửi lặp.
     private static void requireRequestId(String requestId) {
         if (requestId == null || requestId.isBlank()) {
             throw new AuthException(ErrorCode.INVALID_REQUEST, "requestId is required");

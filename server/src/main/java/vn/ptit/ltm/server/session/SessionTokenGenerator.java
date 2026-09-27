@@ -8,6 +8,7 @@ final class SessionTokenGenerator {
 
     private final SecureRandom secureRandom = new SecureRandom();
 
+    // Sinh mã phiên bằng nguồn ngẫu nhiên an toàn để khó đoán token của người khác.
     String generate() {
         byte[] bytes = new byte[TOKEN_BYTES];
         secureRandom.nextBytes(bytes);

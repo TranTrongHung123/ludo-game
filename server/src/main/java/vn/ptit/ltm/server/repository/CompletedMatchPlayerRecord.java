@@ -14,6 +14,7 @@ public record CompletedMatchPlayerRecord(
         BigDecimal scoreEarned,
         MatchParticipantStatus status
 ) {
+    // Kiểm tra hạng, điểm và trạng thái của người chơi trong kết quả cần lưu.
     public CompletedMatchPlayerRecord {
         Objects.requireNonNull(displayName, "displayName");
         Objects.requireNonNull(color, "color");

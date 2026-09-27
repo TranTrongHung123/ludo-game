@@ -21,6 +21,7 @@ public record MatchParticipantDto(
         BigDecimal scoreEarned,
         List<PieceDto> pieces
 ) {
+    // Bảo đảm màu khớp slot, bốn quân đúng chủ và hạng nằm trong giới hạn.
     public MatchParticipantDto {
         Objects.requireNonNull(playerId, "playerId");
         Objects.requireNonNull(displayName, "displayName");

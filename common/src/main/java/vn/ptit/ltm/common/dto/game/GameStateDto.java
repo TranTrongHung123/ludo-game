@@ -39,6 +39,7 @@ public record GameStateDto(
                 validPieceIds, phaseDurationMillis, serverDeadlineEpochMillis, participants, specialCells, stateVersion, move);
     }
 
+    // Kiểm tra snapshot có lượt, slot và participant nhất quán trước khi truyền qua mạng.
     public GameStateDto {
         Objects.requireNonNull(roomId, "roomId");
         Objects.requireNonNull(matchId, "matchId");

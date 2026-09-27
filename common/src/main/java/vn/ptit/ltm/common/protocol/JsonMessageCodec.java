@@ -21,6 +21,7 @@ public final class JsonMessageCodec {
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
     }
 
+    // Chuyển envelope thành byte JSON và kiểm tra giới hạn frame.
     public byte[] encode(MessageEnvelope message) throws ProtocolException {
         Objects.requireNonNull(message, "message");
         try {
@@ -32,6 +33,7 @@ public final class JsonMessageCodec {
         }
     }
 
+    // Giải mã payload thành envelope, chuyển lỗi JSON thành lỗi protocol.
     public MessageEnvelope decode(byte[] payload) throws ProtocolException {
         Objects.requireNonNull(payload, "payload");
         validateEncodedLength(payload.length);
@@ -46,6 +48,7 @@ public final class JsonMessageCodec {
         return objectMapper;
     }
 
+    // Cấu hình bộ ánh xạ JSON dùng chung cho các message.
     public static ObjectMapper createDefaultObjectMapper() {
         return JsonMapper.builder()
                 .defaultPropertyInclusion(JsonInclude.Value.construct(
@@ -56,6 +59,7 @@ public final class JsonMessageCodec {
                 .build();
     }
 
+    // Chặn payload rỗng hoặc vượt kích thước tối đa trước khi gửi.
     private static void validateEncodedLength(int length) throws ProtocolException {
         if (length <= 0 || length > ProtocolConstants.MAX_FRAME_LENGTH) {
             throw new ProtocolException("Invalid message length: " + length);

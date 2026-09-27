@@ -60,7 +60,7 @@ class RematchIntegrationTest {
             assertEquals(PlayerPresenceState.IN_ROOM, a.presenceState());
             assertTrue(rooms.gameForPlayer(1).isEmpty());
             assertNull(rooms.restoreSession(a).gameOver());
-            // Departed slot is reusable and cannot carry readiness into the new match.
+            // Slot đã rời được dùng lại nhưng không giữ trạng thái Ready của ván cũ.
             var joined = rooms.joinRoom(b.sessionId(), b.connectionId(), id);
             assertFalse(joined.players().stream().filter(p -> p.playerId().equals("2")).findFirst().orElseThrow().ready());
             assertThrows(RoomException.class, () -> rooms.startGame(a.sessionId(), a.connectionId(), id));

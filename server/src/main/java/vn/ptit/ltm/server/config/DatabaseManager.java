@@ -16,6 +16,7 @@ public final class DatabaseManager implements AutoCloseable {
         this.dataSource = dataSource;
     }
 
+    // Tạo pool JDBC và chạy Flyway trước khi Server nhận yêu cầu.
     public static DatabaseManager initialize(DatabaseConfig config) {
         Objects.requireNonNull(config, "config");
         HikariConfig hikariConfig = new HikariConfig();
@@ -46,10 +47,12 @@ public final class DatabaseManager implements AutoCloseable {
         return dataSource;
     }
 
+    // Mượn connection từ pool; bên gọi phải đóng sau khi dùng.
     public Connection connection() throws SQLException {
         return dataSource.getConnection();
     }
 
+    // Đóng pool để giải phóng các connection database.
     @Override
     public void close() {
         dataSource.close();

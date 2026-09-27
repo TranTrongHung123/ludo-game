@@ -55,16 +55,19 @@ public final class HeartbeatManager implements ConnectionListener, AutoCloseable
         );
     }
 
+    // Bắt đầu theo dõi heartbeat của connection mới.
     @Override
     public void onConnected(ClientConnection connection) {
         states.put(connection.id(), new HeartbeatState(connection));
     }
 
+    // Bỏ trạng thái heartbeat khi socket đã đóng.
     @Override
     public void onDisconnected(ClientConnection connection) {
         states.remove(connection.id());
     }
 
+    // Ghi nhận phản hồi heartbeat của client đang được theo dõi.
     public void recordPong(ClientConnection connection) {
         HeartbeatState state = states.get(connection.id());
         if (state != null) {
@@ -76,6 +79,7 @@ public final class HeartbeatManager implements ConnectionListener, AutoCloseable
         return states.size();
     }
 
+    // Cô lập lỗi trong lần kiểm tra để lịch heartbeat tiếp tục hoạt động.
     private void tickSafely() {
         try {
             tick();
@@ -84,6 +88,7 @@ public final class HeartbeatManager implements ConnectionListener, AutoCloseable
         }
     }
 
+    // Đếm heartbeat bị lỡ, đóng client quá hạn và gửi lượt PING tiếp theo.
     private void tick() {
         for (HeartbeatState state : states.values()) {
             ClientConnection connection = state.connection();
@@ -111,6 +116,7 @@ public final class HeartbeatManager implements ConnectionListener, AutoCloseable
         }
     }
 
+    // Dừng bộ lập lịch heartbeat và giải phóng trạng thái theo dõi.
     @Override
     public void close() {
         scheduler.shutdownNow();

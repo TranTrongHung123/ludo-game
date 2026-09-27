@@ -52,7 +52,7 @@ class RoomServiceChatTest {
             assertEquals("SecondPlayer", secondMsg.senderDisplayName());
             assertEquals(1, secondMsg.senderSlotIndex());
             assertEquals(PieceColor.BLUE, secondMsg.senderColor());
-            assertEquals("Hi host!", secondMsg.message()); // trimmed
+            assertEquals("Hi host!", secondMsg.message()); // Nội dung đã bỏ khoảng trắng thừa.
         }
     }
 

@@ -141,6 +141,7 @@ public final class RoomService implements AutoCloseable {
         this.previousPresence = presenceSnapshot();
     }
 
+    // Xác thực người đang ở sảnh, tạo phòng và cập nhật presence của chủ phòng.
     public RoomDto createRoom(String sessionId, String connectionId) {
         PlayerSession session = sessionManager.requireAuthenticated(sessionId, connectionId);
         requireNotInRoom(session.user().id());
@@ -158,6 +159,7 @@ public final class RoomService implements AutoCloseable {
         }
     }
 
+    // Kiểm tra quyền vào phòng, cập nhật presence và hủy lời mời không còn phù hợp.
     public RoomDto joinRoom(String sessionId, String connectionId, String roomId) {
         PlayerSession session = sessionManager.requireAuthenticated(sessionId, connectionId);
         requireNotInRoom(session.user().id());
@@ -176,6 +178,7 @@ public final class RoomService implements AutoCloseable {
         }
     }
 
+    // Xử lý rời phòng chờ hoặc bỏ cuộc ngay trong trận rồi trả người chơi về sảnh.
     public void leaveRoom(String sessionId, String connectionId, String roomId) {
         PlayerSession session = sessionManager.requireAuthenticated(sessionId, connectionId);
         requireRoomId(roomId);
@@ -204,6 +207,7 @@ public final class RoomService implements AutoCloseable {
         }
     }
 
+    // Tạo lời mời có hạn và thay lời mời cũ của cùng người nhận.
     public InvitationDto invitePlayer(
             String sessionId,
             String connectionId,
@@ -250,6 +254,7 @@ public final class RoomService implements AutoCloseable {
         return pending.toDto();
     }
 
+    // Kiểm tra người nhận vẫn rỗi trước khi gửi lời mời qua kết nối đang hoạt động.
     public void deliverInvitation(InvitationDto invitation) {
         PendingInvitation pending;
         synchronized (invitationLock) {
@@ -276,18 +281,21 @@ public final class RoomService implements AutoCloseable {
         }
     }
 
+    // Tiêu thụ lời mời rồi dùng lại toàn bộ kiểm tra tham gia phòng.
     public RoomDto acceptInvitation(String sessionId, String connectionId, String invitationId) {
         PlayerSession target = sessionManager.requireAuthenticated(sessionId, connectionId);
         PendingInvitation invitation = consumeInvitation(invitationId, target.user().id());
         return joinRoom(sessionId, connectionId, invitation.roomId());
     }
 
+    // Xóa lời mời của đúng người nhận để không thể dùng lại.
     public void rejectInvitation(String sessionId, String connectionId, String invitationId) {
         PlayerSession target = sessionManager.requireAuthenticated(sessionId, connectionId);
         consumeInvitation(invitationId, target.user().id());
         LOGGER.info("Player {} rejected invitation {}", target.user().id(), invitationId);
     }
 
+    // Lưu kết quả trước khi mở lại phòng FINISHED, sau đó cập nhật Ready.
     public RoomDto setReady(
             String sessionId,
             String connectionId,
@@ -299,7 +307,7 @@ public final class RoomService implements AutoCloseable {
         GameRoom room = roomManager.requireRoomForPlayer(roomId, session.user().id());
         synchronized (room) {
             if (ready) {
-                // Never discard a finished match when saving it failed.
+                // Chỉ mở ván mới khi đã lưu thành công kết quả ván trước.
                 persistCompletedMatch(room);
                 if (room.reopenForRematch(session.user().id())) {
                     timeoutManager.cancel(roomId);
@@ -315,6 +323,7 @@ public final class RoomService implements AutoCloseable {
         return snapshot(room);
     }
 
+    // Khởi tạo trận, cập nhật presence, hủy lời mời và đăng ký timeout lượt đầu.
     public GameStateDto startGame(String sessionId, String connectionId, String roomId) {
         PlayerSession host = sessionManager.requireAuthenticated(sessionId, connectionId);
         requireRoomId(roomId);
@@ -329,6 +338,7 @@ public final class RoomService implements AutoCloseable {
         return room.gameSnapshot(presenceSnapshot());
     }
 
+    // Kiểm tra deadline trước khi tung và cập nhật lịch timeout theo phase mới.
     public DiceResultDto rollDice(String sessionId, String connectionId, String roomId) {
         PlayerSession player = sessionManager.requireAuthenticated(sessionId, connectionId);
         requireRoomId(roomId);
@@ -349,6 +359,7 @@ public final class RoomService implements AutoCloseable {
         return result;
     }
 
+    // Áp dụng nước đi hợp lệ, lưu kết quả nếu trận kết thúc và cập nhật timeout.
     public MovePieceResultDto movePiece(
             String sessionId,
             String connectionId,
@@ -384,6 +395,7 @@ public final class RoomService implements AutoCloseable {
         return result;
     }
 
+    // Dọn membership khi đăng xuất hoặc kết thúc phiên, xử lý bỏ cuộc nếu còn thi đấu.
     public void leaveForSessionEnd(long userId) {
         roomManager.findByPlayer(userId).ifPresent(room -> {
             Map<Long, PlayerPresenceState> presence = presenceSnapshot();
@@ -416,21 +428,25 @@ public final class RoomService implements AutoCloseable {
         return roomManager.findByPlayer(userId).map(this::snapshot);
     }
 
+    // Khôi phục dữ liệu phòng và trận tương ứng với phiên vừa kết nối lại.
     public ReconnectResult restoreSession(PlayerSession session) {
         return roomManager.findByPlayer(session.user().id())
                 .map(room -> room.restore(session, presenceSnapshot()))
                 .orElseGet(() -> new ReconnectResult(true, session.presenceState(), null, null));
     }
 
+    // Chỉ trả snapshot trận cho người có quyền trong phòng được yêu cầu.
     public Optional<GameStateDto> gameForPlayer(long userId) {
         return roomManager.findByPlayer(userId)
                 .flatMap(room -> room.gameSnapshotIfStarted(presenceSnapshot()));
     }
 
+    // Gửi trạng thái phòng tới các thành viên còn kết nối.
     public void broadcastRoom(String roomId) {
         roomManager.findById(roomId).ifPresent(this::broadcast);
     }
 
+    // Gửi snapshot đầy đủ của trận nếu phòng đã bắt đầu.
     public void broadcastGame(String roomId) {
         roomManager.findById(roomId).ifPresent(room -> room
                 .gameSnapshotIfStarted(presenceSnapshot())
@@ -438,6 +454,7 @@ public final class RoomService implements AutoCloseable {
         );
     }
 
+    // Phát trạng thái gameplay mới và kết quả khi trận đã hoàn tất.
     public void broadcastGameUpdated(String roomId) {
         roomManager.findById(roomId).ifPresent(room -> room
                 .gameSnapshotIfStarted(presenceSnapshot())
@@ -450,11 +467,13 @@ public final class RoomService implements AutoCloseable {
         );
     }
 
+    // Gửi cùng kết quả xúc xắc do Server sinh cho cả phòng.
     public void broadcastDiceResult(String roomId, DiceResultDto result) {
         roomManager.findById(roomId)
                 .ifPresent(room -> broadcast(room, MessageType.DICE_RESULT, result));
     }
 
+    // Xác thực thành viên, kiểm tra nội dung và gắn danh tính người gửi từ phiên.
     public ChatMessageDto sendChatMessage(
             String sessionId,
             String connectionId,
@@ -489,22 +508,21 @@ public final class RoomService implements AutoCloseable {
         );
     }
 
+    // Chuyển tin nhắn chat tới đúng các thành viên trong phòng.
     public void broadcastChatMessage(String roomId, ChatMessageDto chatMessage) {
         roomManager.findById(roomId)
                 .ifPresent(room -> broadcast(room, MessageType.CHAT_MESSAGE, chatMessage));
     }
 
+    // Rà soát các phòng và xử lý những phase đã tới hạn.
     void processExpiredTurns() {
         for (GameRoom room : roomManager.snapshot()) {
             room.timeoutExpectation().ifPresent(expectation -> handleScheduledTimeout(room, expectation));
         }
     }
 
-    /**
-     * Đồng bộ thay đổi session vào phòng. DISCONNECTED vẫn còn trong snapshot nên chỉ
-     * cập nhật presence; chỉ khi session biến mất sau grace period mới xử lý remove ở
-     * phòng chờ hoặc FORFEITED trong trận đang chạy.
-     */
+    // Đồng bộ thay đổi session vào phòng. DISCONNECTED vẫn còn trong snapshot nên chỉ cập nhật presence; chỉ khi
+    // session biến mất sau grace period mới xử lý remove ở phòng chờ hoặc FORFEITED trong trận đang chạy.
     public synchronized void onSessionsChanged() {
         if (closed.get()) {
             return;
@@ -577,12 +595,14 @@ public final class RoomService implements AutoCloseable {
         return room.snapshot(presenceSnapshot());
     }
 
+    // Xử lý timeout trước yêu cầu đến muộn để không kéo dài lượt.
     private boolean expireBeforeRequest(GameRoom room, Instant now) {
         Optional<GameRoom.TimeoutOutcome> outcome = room.expireCurrentPhase(now, presenceSnapshot());
         outcome.ifPresent(value -> handleTimeoutOutcome(room, value));
         return outcome.isPresent();
     }
 
+    // Thay lịch timeout bằng deadline mới nhất hoặc hủy lịch nếu hết trận.
     private void scheduleTurnTimeout(GameRoom room) {
         Optional<GameRoom.TimeoutExpectation> expectation = room.timeoutExpectation();
         if (expectation.isEmpty()) {
@@ -597,6 +617,7 @@ public final class RoomService implements AutoCloseable {
         );
     }
 
+    // Đối chiếu mốc đã chụp với phòng trước khi chấp nhận callback timeout.
     private void handleScheduledTimeout(GameRoom room, GameRoom.TimeoutExpectation expectation) {
         Optional<GameRoom.TimeoutOutcome> outcome = room.expireIfExpected(
                 expectation,
@@ -610,6 +631,7 @@ public final class RoomService implements AutoCloseable {
         }
     }
 
+    // Đăng ký lượt mới rồi phát sự kiện hết giờ và snapshot sau timeout.
     private void handleTimeoutOutcome(GameRoom room, GameRoom.TimeoutOutcome outcome) {
         scheduleTurnTimeout(room);
         TurnTimeoutDto timeout = outcome.timeout();
@@ -623,6 +645,7 @@ public final class RoomService implements AutoCloseable {
         broadcast(room, MessageType.GAME_STATE_UPDATED, outcome.gameState());
     }
 
+    // Chụp presence theo userId để ghép dữ liệu kết nối với phòng và trận.
     private Map<Long, PlayerPresenceState> presenceSnapshot() {
         Map<Long, PlayerPresenceState> presence = new HashMap<>();
         for (SessionSnapshot snapshot : sessionManager.snapshots()) {
@@ -631,6 +654,7 @@ public final class RoomService implements AutoCloseable {
         return Map.copyOf(presence);
     }
 
+    // Lưu trận đúng một lần; chỉ đánh dấu hoàn tất sau khi database ghi thành công.
     private void persistCompletedMatch(GameRoom room) {
         if (matchService == null) {
             return;
@@ -647,6 +671,7 @@ public final class RoomService implements AutoCloseable {
         }
     }
 
+    // Gửi sự kiện riêng từng kết nối để một client lỗi không chặn các client còn lại.
     private void broadcast(GameRoom room) {
         if (room.isClosed()) {
             return;
@@ -655,6 +680,7 @@ public final class RoomService implements AutoCloseable {
         broadcast(room, MessageType.ROOM_UPDATED, new RoomPayload(snapshot));
     }
 
+    // Gửi sự kiện riêng từng kết nối để một client lỗi không chặn các client còn lại.
     private void broadcast(GameRoom room, MessageType type, Object payload) {
         MessageEnvelope event = messageFactory.event(type, payload);
         for (Long userId : room.memberUserIds()) {
@@ -677,6 +703,7 @@ public final class RoomService implements AutoCloseable {
         }
     }
 
+    // Kiểm tra người nhận và hạn dùng rồi loại lời mời khỏi cả hai chỉ mục.
     private PendingInvitation consumeInvitation(String invitationId, long targetUserId) {
         if (invitationId == null || invitationId.isBlank()) {
             throw new RoomException(ErrorCode.INVALID_REQUEST, "Invitation ID is required");
@@ -709,6 +736,7 @@ public final class RoomService implements AutoCloseable {
         }
     }
 
+    // Hủy lời mời của phòng khi thành viên hoặc trạng thái phòng thay đổi.
     private void invalidateInvitationsForRoom(String roomId) {
         synchronized (invitationLock) {
             invitationsById.values().removeIf(invitation -> {
@@ -738,6 +766,7 @@ public final class RoomService implements AutoCloseable {
         }
     }
 
+    // Đóng kết nối gửi thất bại để không tiếp tục dùng socket đã hỏng.
     private static void send(ClientConnection connection, MessageEnvelope event) {
         try {
             connection.send(event);

@@ -52,6 +52,7 @@ public final class TcpServer implements AutoCloseable {
         this.clientExecutor = Executors.newFixedThreadPool(workerThreads, new NamedThreadFactory("tcp-client"));
     }
 
+    // Mở cổng TCP và khởi động luồng nhận kết nối.
     public synchronized void start() throws IOException {
         if (closed.get()) {
             throw new IllegalStateException("Server is already closed");
@@ -89,6 +90,7 @@ public final class TcpServer implements AutoCloseable {
         return connections.size();
     }
 
+    // Nhận liên tục các client mới và giao việc đọc socket cho thread pool.
     private void acceptLoop() {
         while (running.get()) {
             try {
@@ -108,6 +110,7 @@ public final class TcpServer implements AutoCloseable {
         }
     }
 
+    // Đăng ký connection và xử lý trường hợp không thể nhận thêm tác vụ.
     private void submit(Socket socket) {
         ClientConnection connection = new ClientConnection(socket, new MessageIO());
         connections.add(connection);
@@ -134,6 +137,7 @@ public final class TcpServer implements AutoCloseable {
         }
     }
 
+    // Đóng socket lắng nghe, các client và thread pool theo vòng đời Server.
     @Override
     public synchronized void close() {
         if (!closed.compareAndSet(false, true)) {
@@ -157,6 +161,7 @@ public final class TcpServer implements AutoCloseable {
         LOGGER.info("TCP server stopped");
     }
 
+    // Chờ tác vụ nền kết thúc trong thời hạn khi dọn Server.
     private static void awaitTermination(ExecutorService executor) {
         try {
             if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {

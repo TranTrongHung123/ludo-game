@@ -20,10 +20,12 @@ public final class MessageIO {
         this.messageCodec = Objects.requireNonNull(messageCodec, "messageCodec");
     }
 
+    // Ghép bước đọc frame và giải mã JSON thành một message.
     public MessageEnvelope read(InputStream input) throws IOException {
         return messageCodec.decode(frameReader.readFrame(input));
     }
 
+    // Mã hóa message thành JSON rồi ghi theo framing TCP.
     public void write(OutputStream output, MessageEnvelope message) throws IOException {
         frameWriter.writeFrame(output, messageCodec.encode(message));
     }

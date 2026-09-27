@@ -20,6 +20,7 @@ public record MessageEnvelope(
         Objects.requireNonNull(type, "type");
     }
 
+    // Không đưa sessionId và payload có thể chứa mật khẩu vào chuỗi log.
     @Override
     public String toString() {
         return "MessageEnvelope[type=" + type

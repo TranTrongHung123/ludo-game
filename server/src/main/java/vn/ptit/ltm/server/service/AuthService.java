@@ -35,6 +35,7 @@ public final class AuthService {
         this.dummyPasswordHash = passwordHasher.hash(DUMMY_PASSWORD);
     }
 
+    // Kiểm tra dữ liệu, hash mật khẩu và xử lý username trùng khi tạo tài khoản.
     public RegisterResult register(RegisterRequest request) {
         Objects.requireNonNull(request, "request");
         AuthValidator.validateRegistration(request.username(), request.password(), request.displayName());
@@ -69,6 +70,7 @@ public final class AuthService {
         }
     }
 
+    // Kiểm tra mật khẩu và tạo phiên duy nhất trên connection đang đăng nhập.
     public LoginResult login(LoginRequest request, String connectionId) {
         Objects.requireNonNull(request, "request");
         AuthValidator.validateLogin(request.username(), request.password());
@@ -93,10 +95,12 @@ public final class AuthService {
         }
     }
 
+    // Dùng chung thông báo cho sai tài khoản hoặc mật khẩu để tránh lộ thông tin tài khoản.
     private static AuthException invalidCredentials() {
         return new AuthException(ErrorCode.INVALID_CREDENTIALS, "Invalid username or password");
     }
 
+    // Chỉ đưa thông tin công khai của tài khoản vào hồ sơ trả client.
     private static PlayerProfileDto toProfile(UserAccountRecord user) {
         return new PlayerProfileDto(
                 Long.toString(user.id()),

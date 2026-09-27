@@ -1,0 +1,180 @@
+using System;
+using System.IO;
+using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
+
+namespace Ludo.Services
+{
+    public sealed class ServerRequestException : Exception
+    {
+        public string Code { get; }
+        public ServerRequestException(string code) : base("Server rejected request.") { Code = code; }
+    }
+
+    public sealed partial class NetworkSession
+    {
+        public JArray OnlinePlayers { get; private set; } = new JArray();
+        public JObject Invitation { get; private set; }
+        public JObject Room { get; private set; }
+        public JObject GameState { get; private set; }
+        public event Action LobbyChanged;
+        private bool reconnecting;
+        private int onlineVersion;
+
+        // Thử khôi phục trong 60 giây và chỉ chạy một vòng reconnect tại một thời điểm.
+        private async Task ReconnectAsync()
+        {
+            if (reconnecting || disposed) return;
+            reconnecting = true;
+            var deadline = DateTime.UtcNow.AddSeconds(60);
+            try
+            {
+                while (!disposed && SessionId != null && DateTime.UtcNow < deadline)
+                {
+                    await Task.Delay(1000);
+                    if (disposed || SessionId == null) return;
+                    await ConnectAsync();
+                    if (State == ConnectionState.Connected) { LobbyChanged?.Invoke(); return; }
+                }
+                if (!disposed && SessionId != null)
+                {
+                    ClearAuthentication();
+                    AuthNotice = "Không thể khôi phục kết nối. Vui lòng đăng nhập lại.";
+                    SetState(ConnectionState.Disconnected);
+                }
+            }
+            finally { reconnecting = false; }
+        }
+
+        // Phân phối sự kiện Server tới trạng thái sảnh, phòng, trận hoặc chat.
+        private void ApplyLobbyEvent(JObject message)
+        {
+            if (SessionId == null) return;
+            var data = message["data"] as JObject;
+            switch ((string)message["type"])
+            {
+                case "ONLINE_PLAYERS_UPDATED":
+                    if (data?["players"] is not JArray players) return;
+                    ApplyOnlinePlayers(players); onlineVersion++; break;
+                case "INVITE_PLAYER":
+                    if (data?["invitationId"]?.Type != JTokenType.String || data["expiresAtEpochMillis"]?.Type != JTokenType.Integer) return;
+                    Invitation = data; break;
+                case "ROOM_UPDATED":
+                    if (data == null) return;
+                    ApplyRoom(data["room"] as JObject); break;
+                case "GAME_STATE":
+                case "GAME_STATE_UPDATED":
+                    if (data == null) return;
+                    if (!ApplyGameState(data)) return; break;
+                case "DICE_RESULT":
+                case "TURN_TIMEOUT":
+                case "GAME_OVER":
+                    ApplyGameEvent((string)message["type"], data); return;
+                case "CHAT_MESSAGE":
+                    ApplyChatEvent(data); return;
+                default: return;
+            }
+            LobbyChanged?.Invoke();
+        }
+
+        // Gửi kèm token và xóa phiên khi Server báo hết hạn hoặc không được xác thực.
+        private async Task<JObject> AuthenticatedRequest(string type, JObject data, string responseType = null)
+        {
+            if (State != ConnectionState.Connected || SessionId == null) throw new IOException();
+            var activeClient = client;
+            var response = await activeClient.RequestAsync(type, data, SessionId, responseType);
+            if (disposed || activeClient != client) throw new IOException();
+            if ((bool?)response["success"] != true)
+            {
+                string code = (string)response["error"]?["code"];
+                if (code == "SESSION_EXPIRED" || code == "UNAUTHORIZED")
+                { ClearAuthentication(); activeClient.Dispose(); SetState(ConnectionState.Disconnected); }
+                throw new ServerRequestException(code);
+            }
+            return response["data"] as JObject ?? throw new InvalidDataException();
+        }
+
+        // Không để phản hồi tải lại cũ ghi đè một broadcast danh sách online mới hơn.
+        public async Task RefreshOnlineAsync()
+        {
+            int version = onlineVersion;
+            var data = await AuthenticatedRequest("GET_ONLINE_PLAYERS", new JObject(), "ONLINE_PLAYERS_UPDATED");
+            if (data["players"] is not JArray players) throw new InvalidDataException();
+            if (version == onlineVersion) ApplyOnlinePlayers(players);
+            LobbyChanged?.Invoke();
+        }
+        // Tạo, tham gia hoặc nhận lời mời rồi áp dụng phòng đã được Server xác nhận.
+        public async Task EnterRoomAsync(string type, string value = null)
+        {
+            if (type != "CREATE_ROOM" && type != "JOIN_ROOM" && type != "ACCEPT_INVITE") throw new ArgumentException(nameof(type));
+            var data = type == "CREATE_ROOM" ? new JObject() : new JObject { [type == "JOIN_ROOM" ? "roomId" : "invitationId"] = value };
+            var result = await AuthenticatedRequest(type, data);
+            ApplyRoom(result["room"] as JObject ?? throw new InvalidDataException());
+            Invitation = null;
+            LobbyChanged?.Invoke();
+        }
+        // Chỉ xóa lời mời đang hiển thị nếu ID vẫn khớp với thao tác vừa xử lý.
+        public void ClearInvitation(string id)
+        {
+            if ((string)Invitation?["invitationId"] == id) { Invitation = null; LobbyChanged?.Invoke(); }
+        }
+        // Chờ Server xác nhận từ chối rồi xóa lời mời tương ứng trên giao diện.
+        public async Task RejectInvitationAsync(string id)
+        {
+            await AuthenticatedRequest("REJECT_INVITE", new JObject { ["invitationId"] = id });
+            ClearInvitation(id);
+        }
+        // Chờ Server đóng phiên trước khi xóa thông tin đăng nhập cục bộ.
+        public async Task LogoutAsync()
+        {
+            await AuthenticatedRequest("LOGOUT", new JObject());
+            ClearAuthentication();
+            AuthNotice = "Đã đăng xuất an toàn.";
+        }
+        // Xóa toàn bộ dữ liệu gắn với phiên để tài khoản sau không dùng nhầm trạng thái cũ.
+        private void ClearAuthentication()
+        {
+            SessionId = null; Profile = null; Room = null; ClearGame(); Invitation = null;
+            OnlinePlayers = new JArray(); onlineVersion++;
+            retiredMatchId = null;
+        }
+
+        // Đồng bộ hồ sơ của chính mình theo playerId từ danh sách Server gửi.
+        private void ApplyOnlinePlayers(JArray players)
+        {
+            OnlinePlayers = players;
+            if (Profile == null) return;
+            foreach (var player in players)
+            {
+                if ((string)player["playerId"] != (string)Profile["playerId"]) continue;
+                foreach (string field in new[] { "displayName", "totalScore", "firstPlaceCount" })
+                    if (player[field] != null) Profile[field] = player[field].DeepClone();
+                break;
+            }
+        }
+
+        // Ghi nhớ match đã đóng khi phòng chờ mở lại để chặn snapshot ván cũ đến muộn.
+        private void ApplyRoom(JObject room)
+        {
+            Room = room;
+            if (room == null) return;
+            if ((string)room["state"] == "WAITING" && GameState != null)
+            {
+                retiredMatchId = (string)GameState["matchId"];
+                ClearGame();
+            }
+            SyncParticipantPresence();
+        }
+
+        // Cập nhật presence từ phòng độc lập với phiên bản trạng thái trận đấu.
+        private void SyncParticipantPresence()
+        {
+            if (GameState?["participants"] is not JArray participants || Room?["players"] is not JArray players ||
+                (string)GameState["roomId"] != (string)Room["roomId"]) return;
+            foreach (var participant in participants)
+                foreach (var player in players)
+                    if ((string)participant["playerId"] == (string)player["playerId"] && player["presenceState"] != null)
+                        participant["presenceState"] = player["presenceState"].DeepClone();
+        }
+    }
+}

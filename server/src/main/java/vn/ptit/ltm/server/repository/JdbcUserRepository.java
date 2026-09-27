@@ -27,6 +27,7 @@ public final class JdbcUserRepository implements UserRepository {
         this.dataSource = Objects.requireNonNull(dataSource, "dataSource");
     }
 
+    // Tìm tài khoản bằng truy vấn tham số để không ghép dữ liệu người dùng vào SQL.
     @Override
     public Optional<UserAccountRecord> findByUsername(String username) throws SQLException {
         requireNonBlank(username, "username");
@@ -42,6 +43,7 @@ public final class JdbcUserRepository implements UserRepository {
         }
     }
 
+    // Lưu tài khoản với mật khẩu đã hash và đọc hồ sơ vừa tạo.
     @Override
     public long create(String username, String passwordHash, String displayName) throws SQLException {
         requireNonBlank(username, "username");
@@ -65,6 +67,7 @@ public final class JdbcUserRepository implements UserRepository {
         }
     }
 
+    // Ánh xạ bản ghi JDBC thành dữ liệu tài khoản cho tầng dịch vụ.
     private static UserAccountRecord mapUser(ResultSet resultSet) throws SQLException {
         return new UserAccountRecord(
                 resultSet.getLong("id"),

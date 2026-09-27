@@ -66,6 +66,7 @@ final class GameRoom {
         return roomId;
     }
 
+    // Cấp slot trống cho thành viên mới dưới khóa riêng của phòng.
     void add(PlayerSession session) {
         lock.lock();
         try {
@@ -88,6 +89,7 @@ final class GameRoom {
         }
     }
 
+    // Rời phòng chờ, giải phóng slot và chuyển chủ phòng nếu cần.
     boolean removeIfWaiting(long userId) {
         lock.lock();
         try {
@@ -118,6 +120,7 @@ final class GameRoom {
         }
     }
 
+    // Chỉ cho chủ phòng còn chỗ và đang chờ gửi lời mời.
     void validateInvitation(long requesterUserId) {
         lock.lock();
         try {
@@ -133,6 +136,7 @@ final class GameRoom {
         }
     }
 
+    // Cập nhật Ready của thành viên khi phòng còn ở trạng thái chờ.
     void setReady(long userId, boolean ready) {
         lock.lock();
         try {
@@ -147,7 +151,7 @@ final class GameRoom {
         }
     }
 
-    // Called only after persistence succeeds. Retain live slots/host, not departed participants.
+    // Chỉ gọi sau khi lưu kết quả; giữ slot và chủ phòng của thành viên chưa rời.
     boolean reopenForRematch(long requesterUserId) {
         lock.lock();
         try {
@@ -175,6 +179,7 @@ final class GameRoom {
         }
     }
 
+    // Chụp phòng, trận và kết quả dưới cùng khóa để reconnect nhận dữ liệu nhất quán.
     ReconnectResult restore(PlayerSession session, Map<Long, PlayerPresenceState> presence) {
         lock.lock();
         try {
@@ -186,6 +191,7 @@ final class GameRoom {
         }
     }
 
+    // Kiểm tra mọi người Ready và đang kết nối, rồi khởi tạo trận từ slot có người nhỏ nhất.
     GameStateDto start(long requesterUserId, Map<Long, PlayerPresenceState> presenceByUserId, Instant now) {
         lock.lock();
         try {
@@ -233,6 +239,7 @@ final class GameRoom {
         }
     }
 
+    // Giữ khóa phòng khi kiểm tra deadline và áp dụng kết quả tung xúc xắc.
     DiceResultDto rollDice(long userId, DiceRoller diceRoller, Instant now) {
         lock.lock();
         try {
@@ -252,6 +259,7 @@ final class GameRoom {
         }
     }
 
+    // Thực hiện nước đi và cập nhật snapshot trong một vùng khóa của phòng.
     MovePieceResultDto movePiece(
             long userId,
             String pieceId,
@@ -284,11 +292,8 @@ final class GameRoom {
         }
     }
 
-    /**
-     * Gỡ một người khỏi membership sống sau khi trận đã bắt đầu nhưng vẫn giữ
-     * RoomMember để tạo bảng hạng và lưu kết quả trận. Participant trong Game State
-     * vì thế không bị xóa hoặc đổi thứ hạng khi người chơi quay về Lobby.
-     */
+    // Gỡ một người khỏi membership sống sau khi trận đã bắt đầu nhưng vẫn giữ RoomMember để tạo bảng hạng và lưu kết
+    // quả trận. Participant trong Game State vì thế không bị xóa hoặc đổi thứ hạng khi người chơi quay về Lobby.
     boolean departAfterStart(long userId) {
         lock.lock();
         try {
@@ -317,11 +322,8 @@ final class GameRoom {
         }
     }
 
-    /**
-     * Chuyển người chơi ACTIVE sang FORFEITED dưới lock riêng của phòng. Nếu người bị
-     * loại đang giữ lượt, GameEngine sẽ tạo lượt kế tiếp; nếu chỉ còn một người ACTIVE,
-     * trận kết thúc ngay theo luật cascading.
-     */
+    // Chuyển người chơi ACTIVE sang FORFEITED dưới lock riêng của phòng. Nếu người bị loại đang giữ lượt, GameEngine
+    // sẽ tạo lượt kế tiếp; nếu chỉ còn một người ACTIVE, trận kết thúc ngay theo luật cascading.
     Optional<GameStateDto> forfeitActivePlayer(
             long userId,
             Instant now,
@@ -330,10 +332,8 @@ final class GameRoom {
         return forfeitActivePlayers(List.of(userId), now, presenceByUserId);
     }
 
-    /**
-     * Gom các session cùng hết hạn vào một transition dưới lock phòng để chỉ đánh giá
-     * cascading sau khi toàn bộ participant tương ứng đã thành FORFEITED.
-     */
+    // Gom các session cùng hết hạn vào một transition dưới lock phòng để chỉ đánh giá cascading sau khi toàn bộ
+    // participant tương ứng đã thành FORFEITED.
     Optional<GameStateDto> forfeitActivePlayers(
             List<Long> userIds,
             Instant now,
@@ -363,10 +363,8 @@ final class GameRoom {
         }
     }
 
-    /**
-     * Tạo bảng kết quả từ trạng thái cuối cùng trong RAM. Điểm tổng ở đây là ảnh chụp
-     * trước trận cộng điểm vừa nhận; việc ghi lâu dài vẫn thuộc tầng persistence.
-     */
+    // Tạo bảng kết quả từ trạng thái cuối cùng trong RAM. Điểm tổng ở đây là ảnh chụp trước trận cộng điểm vừa nhận;
+    // việc ghi lâu dài vẫn thuộc tầng persistence.
     Optional<GameOverDto> gameOverSnapshot() {
         lock.lock();
         try {
@@ -398,6 +396,7 @@ final class GameRoom {
         }
     }
 
+    // Chuyển trạng thái trận đã kết thúc thành dữ liệu để lưu vào database.
     Optional<CompletedMatchRecord> completedMatchSnapshot() {
         lock.lock();
         try {
@@ -427,6 +426,7 @@ final class GameRoom {
         }
     }
 
+    // Ghi nhận lưu thành công và giữ kết quả có tổng điểm đọc từ database.
     void markMatchPersisted(GameOverDto gameOver) {
         Objects.requireNonNull(gameOver, "gameOver");
         lock.lock();
@@ -443,6 +443,7 @@ final class GameRoom {
         }
     }
 
+    // Kiểm tra kết quả trận hiện tại đã được lưu để tránh ghi lặp.
     boolean matchPersisted() {
         lock.lock();
         try {
@@ -452,6 +453,7 @@ final class GameRoom {
         }
     }
 
+    // Chụp định danh trận, phiên bản, phase và deadline để nhận diện đúng lịch timeout.
     Optional<TimeoutExpectation> timeoutExpectation() {
         lock.lock();
         try {
@@ -475,6 +477,7 @@ final class GameRoom {
         }
     }
 
+    // Kiểm tra và xử lý phase hết hạn ngay trước một yêu cầu gameplay.
     Optional<TimeoutOutcome> expireCurrentPhase(
             Instant now,
             Map<Long, PlayerPresenceState> presenceByUserId
@@ -494,6 +497,7 @@ final class GameRoom {
         }
     }
 
+    // Chỉ áp dụng callback timeout nếu trạng thái phòng vẫn khớp lịch đã đăng ký.
     Optional<TimeoutOutcome> expireIfExpected(
             TimeoutExpectation expectation,
             Instant now,
@@ -507,6 +511,7 @@ final class GameRoom {
         }
     }
 
+    // Lấy snapshot trận dưới khóa và bổ sung trạng thái kết nối mới nhất.
     GameStateDto gameSnapshot(Map<Long, PlayerPresenceState> presenceByUserId) {
         lock.lock();
         try {
@@ -516,6 +521,7 @@ final class GameRoom {
         }
     }
 
+    // Trả snapshot nếu phòng đã có trận, tránh dựng dữ liệu gameplay cho phòng chờ.
     Optional<GameStateDto> gameSnapshotIfStarted(Map<Long, PlayerPresenceState> presenceByUserId) {
         lock.lock();
         try {
@@ -549,6 +555,7 @@ final class GameRoom {
 
     record RoomMemberInfo(long userId, String displayName, int slotIndex, PieceColor color) {}
 
+    // Lấy thông tin thành viên còn trong phòng để xác thực hành động và chat.
     RoomMemberInfo memberInfo(long userId) {
         lock.lock();
         try {
@@ -570,6 +577,7 @@ final class GameRoom {
         }
     }
 
+    // Lấy danh sách người chưa rời để gửi thông báo và đồng bộ phiên.
     List<Long> memberUserIds() {
         lock.lock();
         try {
@@ -583,6 +591,7 @@ final class GameRoom {
         }
     }
 
+    // Tạo dữ liệu phòng gồm chủ phòng, slot, Ready và presence của thành viên.
     RoomDto snapshot(Map<Long, PlayerPresenceState> presenceByUserId) {
         lock.lock();
         try {
@@ -615,6 +624,7 @@ final class GameRoom {
         }
     }
 
+    // Tìm slot nhỏ nhất còn trống theo thứ tự màu cố định.
     private int firstFreeSlot() {
         for (int slot = 0; slot < BoardConstants.MAX_PLAYERS; slot++) {
             if (!membersBySlot.containsKey(slot)) {
@@ -624,6 +634,7 @@ final class GameRoom {
         return -1;
     }
 
+    // Ghép presence mới vào snapshot mà giữ nguyên phiên bản và dữ liệu trình diễn nước đi.
     private GameStateDto gameSnapshotLocked(Map<Long, PlayerPresenceState> presenceByUserId) {
         if (gameState == null) {
             throw new RoomException(ErrorCode.GAME_NOT_STARTED, "Game has not started");
@@ -662,6 +673,7 @@ final class GameRoom {
         );
     }
 
+    // Lấy mốc timeout khi bên gọi đã giữ khóa phòng.
     private TimeoutExpectation timeoutExpectationLocked() {
         if (gameState == null
                 || gameState.roomState() != RoomState.PLAYING
@@ -680,6 +692,7 @@ final class GameRoom {
         );
     }
 
+    // So khớp toàn bộ mốc timeout để callback cũ không làm bỏ lượt mới.
     private Optional<TimeoutOutcome> expireLocked(
             TimeoutExpectation expectation,
             Instant now,
@@ -705,6 +718,7 @@ final class GameRoom {
         return Optional.of(new TimeoutOutcome(timeout, gameSnapshotLocked(presenceByUserId)));
     }
 
+    // Thay trạng thái trận và ghi thời điểm kết thúc khi chuyển sang FINISHED.
     private void recordGameState(GameStateDto replacement, Instant now) {
         gameState = Objects.requireNonNull(replacement, "replacement");
         if (gameState.roomState() == RoomState.FINISHED && matchEndedAt == null) {
@@ -712,6 +726,7 @@ final class GameRoom {
         }
     }
 
+    // Chặn thay đổi phòng chờ khi phòng đã đóng hoặc trận đã bắt đầu.
     private void requireOpenWaiting() {
         if (closed) {
             throw new RoomException(ErrorCode.ROOM_NOT_FOUND, "Room does not exist");
@@ -721,6 +736,7 @@ final class GameRoom {
         }
     }
 
+    // Tạo participant ACTIVE với bốn quân ở bãi từ thành viên phòng.
     private static MatchParticipantDto participant(RoomMember member) {
         String playerId = Long.toString(member.userId());
         PieceColor color = PieceColor.fromSlotIndex(member.slotIndex());
@@ -746,6 +762,7 @@ final class GameRoom {
         );
     }
 
+    // Gắn hồ sơ người chơi với slot, màu và thứ tự tham gia phòng.
     private static RoomMember member(PlayerSession session, int slot, long joinOrder) {
         return new RoomMember(
                 session.user().id(),
@@ -770,6 +787,7 @@ final class GameRoom {
         }
     }
 
+    // Sắp người chưa rời theo thời điểm tham gia để chuyển quyền chủ phòng.
     private List<RoomMember> liveMembersByJoinOrder() {
         return membersBySlot.values().stream()
                 .filter(member -> !departedUserIds.contains(member.userId()))

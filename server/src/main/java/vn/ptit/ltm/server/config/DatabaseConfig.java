@@ -30,10 +30,12 @@ public record DatabaseConfig(
         }
     }
 
+    // Đọc biến môi trường, áp dụng giá trị mặc định và kiểm tra tham số kết nối.
     public static DatabaseConfig fromEnvironment() {
         return fromEnvironment(System.getenv());
     }
 
+    // Đọc biến môi trường, áp dụng giá trị mặc định và kiểm tra tham số kết nối.
     public static DatabaseConfig fromEnvironment(Map<String, String> environment) {
         Objects.requireNonNull(environment, "environment");
 
@@ -77,6 +79,7 @@ public record DatabaseConfig(
         );
     }
 
+    // Ẩn mật khẩu khi cấu hình được đưa vào log.
     @Override
     public String toString() {
         return "DatabaseConfig[jdbcUrl=" + jdbcUrl
@@ -87,6 +90,7 @@ public record DatabaseConfig(
                 + "]";
     }
 
+    // Ưu tiên biến chính, biến tương thích rồi tới giá trị mặc định.
     private static String firstNonBlank(
             Map<String, String> environment,
             String primary,
@@ -106,6 +110,7 @@ public record DatabaseConfig(
         return defaultValue;
     }
 
+    // Cho phép mật khẩu rỗng nếu biến đã được đặt, không tự thay bằng mật khẩu mặc định.
     private static String firstPresent(
             Map<String, String> environment,
             String primary,

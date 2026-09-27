@@ -11,6 +11,7 @@ public record CompletedMatchRecord(
         Instant endedAt,
         List<CompletedMatchPlayerRecord> players
 ) {
+    // Kiểm tra dữ liệu trận đã kết thúc trước khi chuyển sang tầng lưu trữ.
     public CompletedMatchRecord {
         Objects.requireNonNull(matchId, "matchId");
         Objects.requireNonNull(startedAt, "startedAt");

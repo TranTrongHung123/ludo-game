@@ -8,6 +8,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public interface DiceRoller {
     int roll();
 
+    // Tạo nguồn xúc xắc phía Server với giá trị từ 1 đến 6.
     static DiceRoller random() {
         return () -> ThreadLocalRandom.current().nextInt(
                 GameConstants.DICE_MIN,

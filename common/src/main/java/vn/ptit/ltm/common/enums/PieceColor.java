@@ -22,6 +22,7 @@ public enum PieceColor {
         return startIndex;
     }
 
+    // Ánh xạ slot sang màu cố định để Server và Client dùng cùng thứ tự.
     public static PieceColor fromSlotIndex(int slotIndex) {
         for (PieceColor color : values()) {
             if (color.slotIndex == slotIndex) {

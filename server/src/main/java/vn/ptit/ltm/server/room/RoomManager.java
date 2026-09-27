@@ -13,6 +13,7 @@ final class RoomManager {
     private final ConcurrentMap<String, GameRoom> roomsById = new ConcurrentHashMap<>();
     private final ConcurrentMap<Long, String> roomIdByUserId = new ConcurrentHashMap<>();
 
+    // Đăng ký phòng mới và ánh xạ người tạo tới phòng đó.
     GameRoom create(PlayerSession creator) {
         long userId = creator.user().id();
         String roomId = UUID.randomUUID().toString();
@@ -26,6 +27,7 @@ final class RoomManager {
         return room;
     }
 
+    // Cập nhật ánh xạ membership cùng việc thêm người vào phòng.
     GameRoom join(String roomId, PlayerSession player) {
         GameRoom room = roomsById.get(roomId);
         if (room == null) {
@@ -45,6 +47,7 @@ final class RoomManager {
         }
     }
 
+    // Kiểm tra phòng tồn tại và người yêu cầu đang thuộc phòng.
     GameRoom requireRoomForPlayer(String roomId, long userId) {
         String currentRoomId = roomIdByUserId.get(userId);
         if (currentRoomId == null || !currentRoomId.equals(roomId)) {
@@ -58,6 +61,7 @@ final class RoomManager {
         return room;
     }
 
+    // Gỡ người khỏi phòng chờ và xóa phòng nếu không còn thành viên.
     Optional<GameRoom> leaveCurrent(long userId) {
         String roomId = roomIdByUserId.get(userId);
         if (roomId == null) {
@@ -78,10 +82,8 @@ final class RoomManager {
         return Optional.of(room);
     }
 
-    /**
-     * Gỡ mapping của người đã Quit hoặc rời một trận kết thúc. GameRoom vẫn giữ
-     * dữ liệu participant lịch sử cho tới khi thành viên sống cuối cùng rời phòng.
-     */
+    // Gỡ mapping của người đã Quit hoặc rời một trận kết thúc. GameRoom vẫn giữ dữ liệu participant lịch sử cho tới
+    // khi thành viên sống cuối cùng rời phòng.
     Optional<GameRoom> departCurrent(long userId) {
         String roomId = roomIdByUserId.get(userId);
         if (roomId == null) {
@@ -102,6 +104,7 @@ final class RoomManager {
         return Optional.of(room);
     }
 
+    // Tra cứu phòng hiện tại qua chỉ mục userId.
     Optional<GameRoom> findByPlayer(long userId) {
         String roomId = roomIdByUserId.get(userId);
         if (roomId == null) {

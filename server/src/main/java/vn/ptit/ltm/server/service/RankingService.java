@@ -14,6 +14,7 @@ public final class RankingService {
         this.matchRepository = Objects.requireNonNull(matchRepository, "matchRepository");
     }
 
+    // Đọc bảng hạng và đóng gói payload, không để lỗi JDBC đi thẳng ra client.
     public RankingPayload ranking() {
         try {
             return new RankingPayload(matchRepository.findRanking());

@@ -67,6 +67,7 @@ public final class SessionManager implements AutoCloseable {
         }
     }
 
+    // Tạo phiên duy nhất cho tài khoản và cập nhật đồng thời các chỉ mục tra cứu.
     public synchronized PlayerSession createSession(UserAccountRecord user, String connectionId) {
         Objects.requireNonNull(user, "user");
         requireConnectionId(connectionId);
@@ -91,6 +92,7 @@ public final class SessionManager implements AutoCloseable {
         return session;
     }
 
+    // Đối chiếu cả mã phiên và connection để không dùng token trên kết nối khác.
     public synchronized PlayerSession requireAuthenticated(String sessionId, String connectionId) {
         PlayerSession session = requireSession(sessionId);
         if (!session.connected() || !Objects.equals(session.connectionId(), connectionId)) {
@@ -99,6 +101,7 @@ public final class SessionManager implements AutoCloseable {
         return session;
     }
 
+    // Khôi phục phiên còn trong thời hạn và gắn với connection mới.
     public synchronized PlayerSession reconnect(String sessionId, String newConnectionId) {
         requireConnectionId(newConnectionId);
         PlayerSession session = requireSession(sessionId);
@@ -122,12 +125,14 @@ public final class SessionManager implements AutoCloseable {
         return session;
     }
 
+    // Hủy ngay phiên đã xác thực và thông báo thay đổi danh sách người chơi.
     public synchronized void logout(String sessionId, String connectionId) {
         PlayerSession session = requireAuthenticated(sessionId, connectionId);
         removeSession(session);
         publishSessionsChanged();
     }
 
+    // Giữ phiên trong grace period và đặt lịch hết hạn theo thế hệ kết nối.
     public synchronized void disconnect(String connectionId) {
         if (connectionId == null) {
             return;
@@ -149,6 +154,7 @@ public final class SessionManager implements AutoCloseable {
         publishSessionsChanged();
     }
 
+    // Cho phép cập nhật presence từ phiên đang kết nối hợp lệ.
     public synchronized void updatePresence(String sessionId, PlayerPresenceState presenceState) {
         PlayerSession session = requireSession(sessionId);
         if (!session.connected()) {
@@ -158,6 +164,7 @@ public final class SessionManager implements AutoCloseable {
         publishSessionsChanged();
     }
 
+    // Cập nhật trạng thái cần khôi phục kể cả khi người chơi đang mất kết nối.
     public synchronized void updatePresenceForUser(long userId, PlayerPresenceState presenceState) {
         String sessionId = sessionIdByUserId.get(userId);
         if (sessionId == null) {
@@ -171,6 +178,7 @@ public final class SessionManager implements AutoCloseable {
         publishSessionsChanged();
     }
 
+    // Đồng bộ điểm và số lần hạng nhất sau khi lưu kết quả trận.
     public synchronized void updateStatisticsForUser(
             long userId,
             BigDecimal totalScore,
@@ -209,6 +217,7 @@ public final class SessionManager implements AutoCloseable {
         return sessionsById.size();
     }
 
+    // Tạo danh sách phiên để sảnh và phòng đọc trạng thái mà không sửa phiên gốc.
     public synchronized List<SessionSnapshot> snapshots() {
         return sessionsById.values().stream()
                 .map(session -> new SessionSnapshot(
@@ -233,6 +242,7 @@ public final class SessionManager implements AutoCloseable {
         return reconnectGracePeriod;
     }
 
+    // Chỉ xóa đúng thế hệ đã mất kết nối để lịch cũ không hủy phiên vừa reconnect.
     private synchronized void expireDisconnectedSession(String sessionId, long expectedGeneration) {
         PlayerSession session = sessionsById.get(sessionId);
         if (session == null
@@ -245,6 +255,7 @@ public final class SessionManager implements AutoCloseable {
         publishSessionsChanged();
     }
 
+    // So thời điểm mất kết nối với thời hạn khôi phục theo đồng hồ Server.
     private boolean isGracePeriodExpired(PlayerSession session) {
         Instant disconnectedAt = session.disconnectedAt();
         return disconnectedAt == null
@@ -268,6 +279,7 @@ public final class SessionManager implements AutoCloseable {
         }
     }
 
+    // Xóa phiên khỏi các chỉ mục tài khoản và kết nối để không còn liên kết treo.
     private void removeSession(PlayerSession session) {
         sessionsById.remove(session.sessionId());
         sessionIdByUserId.remove(session.user().id(), session.sessionId());
@@ -283,6 +295,7 @@ public final class SessionManager implements AutoCloseable {
         }
     }
 
+    // Thông báo thay đổi phiên cho sảnh và phòng qua các listener đã đăng ký.
     private void publishSessionsChanged() {
         if (eventListeners.isEmpty()) {
             return;
@@ -302,6 +315,7 @@ public final class SessionManager implements AutoCloseable {
         }
     }
 
+    // Dừng lịch hết hạn và dọn toàn bộ phiên khi Server đóng.
     @Override
     public synchronized void close() {
         sessionsById.values().forEach(PlayerSession::markOffline);

@@ -8,6 +8,7 @@ import java.io.OutputStream;
 import java.util.Objects;
 
 public final class FrameWriter {
+    // Kiểm tra payload rồi ghi độ dài big-endian và toàn bộ dữ liệu UTF-8.
     public void writeFrame(OutputStream output, byte[] payload) throws IOException {
         Objects.requireNonNull(output, "output");
         Objects.requireNonNull(payload, "payload");

@@ -34,10 +34,12 @@ public final class ClientConnection implements AutoCloseable {
         return !closed.get() && !socket.isClosed();
     }
 
+    // Đọc một envelope hoàn chỉnh từ stream của connection.
     MessageEnvelope read() throws IOException {
         return messageIO.read(socket.getInputStream());
     }
 
+    // Gửi trọn frame dưới khóa ghi để các luồng không trộn byte trên cùng socket.
     public void send(MessageEnvelope message) throws IOException {
         Objects.requireNonNull(message, "message");
         if (!isOpen()) {
@@ -48,6 +50,7 @@ public final class ClientConnection implements AutoCloseable {
         }
     }
 
+    // Đóng connection đúng một lần dù nhiều luồng cùng yêu cầu dọn dẹp.
     @Override
     public void close() {
         if (!closed.compareAndSet(false, true)) {
@@ -56,7 +59,7 @@ public final class ClientConnection implements AutoCloseable {
         try {
             socket.close();
         } catch (IOException ignored) {
-            // Socket close is best-effort; the connection is already unusable.
+            // Kết nối đã không dùng được; lỗi đóng socket không cản việc dọn tài nguyên khác.
         }
     }
 }

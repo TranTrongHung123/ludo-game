@@ -24,6 +24,7 @@ public final class MatchService {
         this.sessionManager = Objects.requireNonNull(sessionManager, "sessionManager");
     }
 
+    // Lưu kết quả trận rồi đồng bộ thống kê các phiên và dựng payload GAME_OVER.
     public GameOverDto completeMatch(String roomId, CompletedMatchRecord match) {
         Objects.requireNonNull(roomId, "roomId");
         Objects.requireNonNull(match, "match");
@@ -72,6 +73,7 @@ public final class MatchService {
         }
     }
 
+    // Giới hạn lịch sử trả về và chuyển lỗi lưu trữ thành lỗi nghiệp vụ.
     public MatchHistoryPayload matchHistory(long userId) {
         try {
             return new MatchHistoryPayload(

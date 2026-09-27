@@ -34,6 +34,7 @@ public final class GameEngine {
     private GameEngine() {
     }
 
+    // Kiểm tra quyền tung, xác định quân đi được và mở phase chọn quân hoặc chuyển lượt.
     public static RollOutcome rollDice(
             GameStateDto state,
             String playerId,
@@ -45,6 +46,7 @@ public final class GameEngine {
         return rollDice(state, playerId, diceRoller.roll(), now);
     }
 
+    // Kiểm tra quyền tung, xác định quân đi được và mở phase chọn quân hoặc chuyển lượt.
     public static RollOutcome rollDice(
             GameStateDto state,
             String playerId,
@@ -65,6 +67,7 @@ public final class GameEngine {
                 validPieceIds
         );
         GameStateDto nextState;
+        // Không có nước đi thì hết lượt ngay, kể cả khi xúc xắc là 6.
         if (validPieceIds.isEmpty()) {
             nextState = beginNextTurn(state, now, state.stateVersion() + 1);
         } else {
@@ -85,6 +88,7 @@ public final class GameEngine {
         return new RollOutcome(diceResult, nextState);
     }
 
+    // Áp dụng nước đi, xử lý capture và hiệu ứng rồi xét kết thúc trận trước khi đổi lượt.
     public static MoveOutcome movePiece(
             GameStateDto state,
             String playerId,
@@ -129,6 +133,7 @@ public final class GameEngine {
         boolean luckyBonus = false;
         replacePiece(participants, selected, movedPiece);
 
+        // Chỉ xét ô vừa dừng do xúc xắc; không kích hoạt tiếp ô ở đích của hiệu ứng.
         if (movedPiece.state() == PieceState.ON_TRACK) {
             int landedCell = BoardCoordinates.toGlobalCell(movedPiece.color(), movedPiece.stepCount());
             SpecialCellDto specialCell = findSpecialCell(state, landedCell);
@@ -171,6 +176,7 @@ public final class GameEngine {
         boolean gameFinished = participants.stream()
                 .noneMatch(participant -> participant.matchStatus() == MatchParticipantStatus.ACTIVE);
         MatchParticipantDto currentAfterMove = participants.get(selected.participantIndex());
+        // Bonus không cộng dồn và chỉ cấp khi người vừa đi vẫn còn ACTIVE.
         boolean bonusRoll = !gameFinished
                 && currentAfterMove.matchStatus() == MatchParticipantStatus.ACTIVE
                 && (state.diceValue() == GameConstants.SPAWN_DICE_VALUE || luckyBonus);
@@ -220,6 +226,7 @@ public final class GameEngine {
         return new MoveOutcome(result, nextState);
     }
 
+    // Lọc quân theo cùng quy tắc kiểm tra được dùng khi thực hiện nước đi.
     public static List<String> calculateValidPieceIds(
             GameStateDto state,
             MatchParticipantDto participant,
@@ -231,6 +238,7 @@ public final class GameEngine {
                 .toList();
     }
 
+    // Bỏ phase hiện tại và bắt đầu lượt của participant ACTIVE kế tiếp.
     public static GameStateDto timeoutTurn(GameStateDto state, Instant now) {
         Objects.requireNonNull(state, "state");
         Objects.requireNonNull(now, "now");
@@ -242,11 +250,9 @@ public final class GameEngine {
         return beginNextTurn(state, now, state.stateVersion() + 1);
     }
 
-    /**
-     * Loại một participant ACTIVE khỏi trận và đánh giá lại điều kiện kết thúc ngay trong
-     * cùng một phép chuyển trạng thái. Hàm này không phụ thuộc session/network để mọi
-     * nguyên nhân bỏ cuộc (quit hoặc hết grace period) dùng chung một luật authoritative.
-     */
+    // Loại một participant ACTIVE khỏi trận và đánh giá lại điều kiện kết thúc ngay trong cùng một phép chuyển trạng
+    // thái. Hàm này không phụ thuộc session/network để mọi nguyên nhân bỏ cuộc (quit hoặc hết grace period) dùng chung
+    // một luật authoritative.
     public static GameStateDto forfeitParticipant(
             GameStateDto state,
             String playerId,
@@ -255,11 +261,9 @@ public final class GameEngine {
         return forfeitParticipants(state, List.of(playerId), now);
     }
 
-    /**
-     * Xử lý đồng thời nhiều session cùng hết grace period. Tất cả participant mục tiêu
-     * được đánh dấu FORFEITED trước khi xét cascading, tránh gán chiến thắng nhầm cho
-     * một người cũng đã hết hạn nhưng event session bị gộp trong cùng snapshot.
-     */
+    // Xử lý đồng thời nhiều session cùng hết grace period. Tất cả participant mục tiêu được đánh dấu FORFEITED trước
+    // khi xét cascading, tránh gán chiến thắng nhầm cho một người cũng đã hết hạn nhưng event session bị gộp trong
+    // cùng snapshot.
     public static GameStateDto forfeitParticipants(
             GameStateDto state,
             List<String> playerIds,
@@ -341,6 +345,7 @@ public final class GameEngine {
         );
     }
 
+    // Kiểm tra ra quân, giới hạn đích và quân cùng màu ở ô dừng; không chặn quân đi ngang.
     private static boolean isValidMove(GameStateDto state, PieceDto piece, int diceValue) {
         if (piece.state() == PieceState.FINISHED) {
             return false;
@@ -368,6 +373,7 @@ public final class GameEngine {
                         && other.stepCount() == targetStep);
     }
 
+    // Suy ra trạng thái quân từ tiến độ tương đối; bước 53 là hoàn thành.
     private static PieceDto moveToStep(PieceDto piece, int targetStep) {
         PieceState targetState;
         if (targetStep <= BoardConstants.LAST_RING_STEP) {
@@ -386,6 +392,7 @@ public final class GameEngine {
         );
     }
 
+    // Đưa quân về bãi với tiến độ âm một để phải chờ đổ 6 ra lại.
     private static PieceDto sendToYard(PieceDto piece) {
         return new PieceDto(
                 piece.pieceId(),
@@ -402,6 +409,7 @@ public final class GameEngine {
                 .orElse(null);
     }
 
+    // Kiểm tra đích tiến hoặc lùi, kể cả biên âm và các ô trong đường đích.
     private static boolean isEffectDestinationValid(
             List<MatchParticipantDto> participants,
             PieceDto piece,
@@ -424,6 +432,7 @@ public final class GameEngine {
                         && other.stepCount() == targetStep);
     }
 
+    // Đá quân ở đích vòng chung trước khi đặt quân đang đi vào vị trí mới.
     private static DestinationResolution resolveDestination(
             List<MatchParticipantDto> participants,
             PieceDto movingPiece,
@@ -446,6 +455,7 @@ public final class GameEngine {
         );
     }
 
+    // Tạo lại participant và danh sách quân để không sửa trực tiếp snapshot đầu vào.
     private static void replacePiece(
             List<MatchParticipantDto> participants,
             PieceLocation location,
@@ -467,6 +477,7 @@ public final class GameEngine {
         ));
     }
 
+    // Gán hạng và điểm cho người hoàn thành hoặc người ACTIVE cuối cùng.
     private static MatchParticipantDto completeParticipant(
             MatchParticipantDto participant,
             int rank,
@@ -485,9 +496,7 @@ public final class GameEngine {
         );
     }
 
-    /**
-     * Gán hạng thấp nhất còn trống, điểm 0 và đưa toàn bộ quân khỏi các ô đang chiếm chỗ.
-     */
+    // Gán hạng thấp nhất còn trống, điểm 0 và đưa toàn bộ quân khỏi các ô đang chiếm chỗ.
     private static MatchParticipantDto forfeitParticipant(
             MatchParticipantDto participant,
             int rank
@@ -505,6 +514,7 @@ public final class GameEngine {
         );
     }
 
+    // Trao hạng tốt nhất còn trống cho người cuối cùng để kết thúc trận ngay.
     private static List<MatchParticipantDto> finishIfOnlyOneActive(
             List<MatchParticipantDto> participants
     ) {
@@ -526,6 +536,7 @@ public final class GameEngine {
         return completed;
     }
 
+    // Tìm hạng nhỏ nhất chưa được gán cho bất kỳ participant nào.
     private static int nextBestRank(List<MatchParticipantDto> participants) {
         Set<Integer> assigned = new HashSet<>();
         participants.stream()
@@ -540,6 +551,7 @@ public final class GameEngine {
         throw new GameException(ErrorCode.INVALID_GAME_STATE, "No rank remains available");
     }
 
+    // Tìm hạng lớn nhất còn trống để gán cho người bỏ cuộc.
     private static int nextWorstRank(List<MatchParticipantDto> participants) {
         Set<Integer> assigned = new HashSet<>();
         participants.stream()
@@ -554,6 +566,7 @@ public final class GameEngine {
         throw new GameException(ErrorCode.INVALID_GAME_STATE, "No rank remains available");
     }
 
+    // Tính điểm theo hạng và số người ban đầu bằng số thập phân chính xác.
     private static BigDecimal scoreForRank(int playerCount, int rank) {
         if (rank == 1) {
             return FIRST_PLACE_SCORE;
@@ -567,10 +580,12 @@ public final class GameEngine {
         return ZERO_SCORE;
     }
 
+    // Chọn participant ACTIVE tiếp theo và khởi tạo lại thời hạn tung xúc xắc.
     private static GameStateDto beginNextTurn(GameStateDto state, Instant now, long version) {
         return beginNextTurn(state, state.participants(), now, version);
     }
 
+    // Chọn participant ACTIVE tiếp theo và khởi tạo lại thời hạn tung xúc xắc.
     private static GameStateDto beginNextTurn(
             GameStateDto state,
             List<MatchParticipantDto> participants,
@@ -581,6 +596,7 @@ public final class GameEngine {
         return beginRollPhase(state, next, participants, now, version);
     }
 
+    // Xóa xúc xắc và danh sách nước đi cũ, tạo deadline mới theo giờ Server.
     private static GameStateDto beginRollPhase(
             GameStateDto state,
             MatchParticipantDto participant,
@@ -603,6 +619,7 @@ public final class GameEngine {
         );
     }
 
+    // Duyệt slot theo vòng cố định; người mất kết nối còn ACTIVE vẫn nhận lượt.
     private static MatchParticipantDto findNextActive(
             List<MatchParticipantDto> participants,
             int currentSlot
@@ -619,6 +636,7 @@ public final class GameEngine {
         throw new GameException(ErrorCode.INVALID_GAME_STATE, "No ACTIVE participant is available");
     }
 
+    // Tìm cả quân lẫn vị trí trong danh sách để thay thế đúng participant.
     private static PieceLocation findPiece(List<MatchParticipantDto> participants, String pieceId) {
         for (int participantIndex = 0; participantIndex < participants.size(); participantIndex++) {
             List<PieceDto> pieces = participants.get(participantIndex).pieces();
@@ -631,6 +649,7 @@ public final class GameEngine {
         return null;
     }
 
+    // So sánh ô toàn cục giữa các màu và bỏ qua chính quân đang di chuyển.
     private static PieceLocation findRingOccupant(
             List<MatchParticipantDto> participants,
             int globalCell,
@@ -650,6 +669,7 @@ public final class GameEngine {
         return null;
     }
 
+    // Lấy participant giữ lượt và báo lỗi nếu snapshot không nhất quán.
     private static MatchParticipantDto currentParticipant(GameStateDto state) {
         return state.participants().stream()
                 .filter(participant -> participant.playerId().equals(state.currentPlayerId()))
@@ -660,18 +680,21 @@ public final class GameEngine {
                 ));
     }
 
+    // Chặn thao tác khi trận chưa bắt đầu hoặc đã kết thúc.
     private static void requirePlaying(GameStateDto state) {
         if (state.roomState() != RoomState.PLAYING || state.turnState() == TurnState.FINISHED) {
             throw new GameException(ErrorCode.GAME_NOT_STARTED, "Game is not currently playing");
         }
     }
 
+    // Chỉ cho người đang giữ lượt thực hiện thao tác gameplay.
     private static void requireCurrentPlayer(GameStateDto state, String playerId) {
         if (!playerId.equals(state.currentPlayerId())) {
             throw new GameException(ErrorCode.NOT_YOUR_TURN, "It is not this player's turn");
         }
     }
 
+    // Kiểm tra trạng thái trận, người giữ lượt và phase cho phép tung.
     private static void validateRoll(GameStateDto state, String playerId, Instant now) {
         Objects.requireNonNull(state, "state");
         Objects.requireNonNull(playerId, "playerId");
@@ -683,6 +706,7 @@ public final class GameEngine {
         }
     }
 
+    // Tạo snapshot mới, giữ định danh trận và bố cục ô đặc biệt.
     private static GameStateDto copyState(
             GameStateDto source,
             RoomState roomState,

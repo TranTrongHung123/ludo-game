@@ -13,10 +13,12 @@ public final class PayloadMapper {
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
     }
 
+    // Chuyển DTO nghiệp vụ thành cây JSON trong envelope.
     public JsonNode toTree(Object payload) {
         return payload == null ? null : objectMapper.valueToTree(payload);
     }
 
+    // Ánh xạ data sang DTO đúng loại trước khi gọi dịch vụ.
     public <T> T fromTree(JsonNode data, Class<T> payloadType) throws JsonProcessingException {
         Objects.requireNonNull(data, "data");
         Objects.requireNonNull(payloadType, "payloadType");

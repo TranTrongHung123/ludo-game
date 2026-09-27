@@ -27,6 +27,7 @@ public final class ClientHandler implements Runnable {
         this.connectionListener = Objects.requireNonNull(connectionListener, "connectionListener");
     }
 
+    // Đọc và dispatch message cho tới khi client đóng hoặc vi phạm protocol; luôn dọn connection.
     @Override
     public void run() {
         try {

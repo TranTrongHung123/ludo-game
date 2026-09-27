@@ -13,6 +13,7 @@ public record PieceDto(
         PieceState state,
         int stepCount
 ) {
+    // Bảo đảm trạng thái quân khớp khoảng stepCount của bãi, vòng chung và đường đích.
     public PieceDto {
         Objects.requireNonNull(pieceId, "pieceId");
         Objects.requireNonNull(ownerPlayerId, "ownerPlayerId");

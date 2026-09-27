@@ -67,6 +67,7 @@ public final class JdbcMatchRepository implements MatchRepository {
         this.dataSource = Objects.requireNonNull(dataSource, "dataSource");
     }
 
+    // Lưu trận, kết quả từng người và điểm trong cùng transaction; retry không cộng điểm lặp.
     @Override
     public PersistedMatchResult saveCompletedMatch(CompletedMatchRecord match) throws SQLException {
         Objects.requireNonNull(match, "match");
@@ -75,6 +76,7 @@ public final class JdbcMatchRepository implements MatchRepository {
             connection.setAutoCommit(false);
             try {
                 Long existingId = findMatchId(connection, match.matchId());
+                // Trận đã tồn tại thì chỉ đọc lại kết quả, không cập nhật thống kê lần nữa.
                 if (existingId != null) {
                     PersistedMatchResult existing = loadPersistedResult(connection, existingId, match.matchId());
                     connection.commit();
@@ -95,6 +97,7 @@ public final class JdbcMatchRepository implements MatchRepository {
                 return persisted;
             } catch (SQLException exception) {
                 rollback(connection, exception);
+                // Hai tác vụ có thể cùng lưu một trận; đọc kết quả đã commit sau xung đột khóa duy nhất.
                 if (isIntegrityViolation(exception)) {
                     PersistedMatchResult concurrentResult = findPersistedResult(match.matchId());
                     if (concurrentResult != null) {
@@ -108,6 +111,7 @@ public final class JdbcMatchRepository implements MatchRepository {
         }
     }
 
+    // Sắp xếp bảng hạng theo điểm, số lần hạng nhất và ID ổn định.
     @Override
     public List<RankingEntryDto> findRanking() throws SQLException {
         try (Connection connection = dataSource.getConnection();
@@ -128,6 +132,7 @@ public final class JdbcMatchRepository implements MatchRepository {
         }
     }
 
+    // Lấy số trận gần nhất theo giới hạn của đúng tài khoản đã xác thực.
     @Override
     public List<MatchHistoryEntryDto> findMatchHistory(long userId, int limit) throws SQLException {
         if (userId <= 0 || limit <= 0) {
@@ -156,6 +161,7 @@ public final class JdbcMatchRepository implements MatchRepository {
         }
     }
 
+    // Khóa bản ghi trận theo public_id để kiểm tra kết quả đã được lưu.
     private static Long findMatchId(Connection connection, String publicId) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(FIND_MATCH_ID)) {
             statement.setString(1, publicId);
@@ -165,6 +171,7 @@ public final class JdbcMatchRepository implements MatchRepository {
         }
     }
 
+    // Tạo bản ghi trận kết thúc và lấy khóa database để liên kết kết quả từng người.
     private static long insertMatch(Connection connection, CompletedMatchRecord match) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
                 INSERT_MATCH,
@@ -183,6 +190,7 @@ public final class JdbcMatchRepository implements MatchRepository {
         }
     }
 
+    // Ghi màu, hạng, điểm và trạng thái hoàn thành hoặc bỏ cuộc của một người.
     private static void insertMatchPlayer(
             Connection connection,
             long matchId,
@@ -199,6 +207,7 @@ public final class JdbcMatchRepository implements MatchRepository {
         }
     }
 
+    // Cộng điểm trận và số lần hạng nhất trong transaction đang lưu kết quả.
     private static void updateUserStatistics(Connection connection, CompletedMatchPlayerRecord player)
             throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(UPDATE_USER_STATISTICS)) {
@@ -214,6 +223,7 @@ public final class JdbcMatchRepository implements MatchRepository {
         }
     }
 
+    // Đọc lại kết quả đã lưu khi một tác vụ khác ghi cùng trận trước.
     private PersistedMatchResult findPersistedResult(String publicId) throws SQLException {
         try (Connection connection = dataSource.getConnection()) {
             Long matchId = findMatchId(connection, publicId);
@@ -221,6 +231,7 @@ public final class JdbcMatchRepository implements MatchRepository {
         }
     }
 
+    // Ghép kết quả trận với tổng điểm tài khoản từ database để trả về client.
     private static PersistedMatchResult loadPersistedResult(
             Connection connection,
             long matchId,
@@ -254,6 +265,7 @@ public final class JdbcMatchRepository implements MatchRepository {
         return "23000".equals(exception.getSQLState());
     }
 
+    // Hoàn tác transaction nhưng giữ lại lỗi gốc nếu thao tác rollback cũng thất bại.
     private static void rollback(Connection connection, SQLException original) {
         try {
             connection.rollback();
@@ -262,6 +274,7 @@ public final class JdbcMatchRepository implements MatchRepository {
         }
     }
 
+    // Khôi phục chế độ connection trước khi trả về pool.
     private static void restoreAutoCommit(Connection connection, boolean autoCommit) throws SQLException {
         if (connection.getAutoCommit() != autoCommit) {
             connection.setAutoCommit(autoCommit);

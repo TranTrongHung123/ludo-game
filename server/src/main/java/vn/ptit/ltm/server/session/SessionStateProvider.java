@@ -6,6 +6,7 @@ import vn.ptit.ltm.common.dto.session.ReconnectResult;
 public interface SessionStateProvider {
     ReconnectResult restore(PlayerSession session);
 
+    // Cung cấp kết quả reconnect chỉ gồm presence khi không có dữ liệu phòng.
     static SessionStateProvider basic() {
         return session -> new ReconnectResult(true, session.presenceState(), null, null);
     }

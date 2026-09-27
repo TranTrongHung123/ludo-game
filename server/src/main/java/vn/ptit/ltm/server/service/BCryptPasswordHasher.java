@@ -20,12 +20,14 @@ public final class BCryptPasswordHasher implements PasswordHasher {
         this.logRounds = logRounds;
     }
 
+    // Hash mật khẩu với salt riêng bằng BCrypt trước khi lưu database.
     @Override
     public String hash(String password) {
         Objects.requireNonNull(password, "password");
         return BCrypt.hashpw(password, BCrypt.gensalt(logRounds));
     }
 
+    // Đối chiếu mật khẩu với hash đã lưu mà không giải mã hash.
     @Override
     public boolean matches(String password, String passwordHash) {
         Objects.requireNonNull(password, "password");

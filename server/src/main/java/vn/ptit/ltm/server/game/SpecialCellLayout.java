@@ -5,9 +5,7 @@ import vn.ptit.ltm.common.enums.SpecialCellType;
 
 import java.util.List;
 
-/**
- * Canonical, rotationally symmetric special-cell layout for every match.
- */
+// Bố cục ô đặc biệt cố định và đối xứng qua bốn phần tư bàn cờ.
 public final class SpecialCellLayout {
     private static final List<SpecialCellDto> CANONICAL = List.of(
             cell(2, SpecialCellType.SPEED),
@@ -31,6 +29,7 @@ public final class SpecialCellLayout {
     private SpecialCellLayout() {
     }
 
+    // Trả bố cục bất biến dùng để khởi tạo các trận.
     public static List<SpecialCellDto> canonical() {
         return CANONICAL;
     }

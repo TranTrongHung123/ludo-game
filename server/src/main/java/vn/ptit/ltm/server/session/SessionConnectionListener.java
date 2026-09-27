@@ -12,6 +12,7 @@ public final class SessionConnectionListener implements ConnectionListener {
         this.sessionManager = Objects.requireNonNull(sessionManager, "sessionManager");
     }
 
+    // Chuyển sự kiện đóng socket thành mất kết nối tạm thời của phiên.
     @Override
     public void onDisconnected(ClientConnection connection) {
         sessionManager.disconnect(connection.id());

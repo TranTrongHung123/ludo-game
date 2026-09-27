@@ -30,7 +30,7 @@ import java.util.Map;
 import java.util.List;
 import java.util.Optional;
 
-/** In-memory repositories behind the real TCP server, used only by integration tests. */
+// Dùng repository trong RAM phía sau TCP Server thật để kiểm thử tích hợp.
 final class WorkflowServer implements AutoCloseable {
     private final SessionManager sessions = new SessionManager(Duration.ofSeconds(2));
     private final HeartbeatManager heartbeat = new HeartbeatManager(Duration.ofSeconds(30), 3);

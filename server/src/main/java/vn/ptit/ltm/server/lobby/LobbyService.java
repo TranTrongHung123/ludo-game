@@ -31,6 +31,7 @@ public final class LobbyService {
         this.messageFactory = new MessageFactory(new JsonMessageCodec().objectMapper());
     }
 
+    // Dựng danh sách người chơi từ snapshot phiên để không lộ token.
     public OnlinePlayersPayload onlinePlayers() {
         List<PlayerSummaryDto> players = sessionManager.snapshots().stream()
                 .sorted(Comparator.comparingLong(SessionSnapshot::userId))
@@ -45,6 +46,7 @@ public final class LobbyService {
         return new OnlinePlayersPayload(players);
     }
 
+    // Phát danh sách mới khi presence hoặc thống kê của người chơi thay đổi.
     public void broadcastOnlinePlayers() {
         MessageEnvelope event = messageFactory.event(
                 MessageType.ONLINE_PLAYERS_UPDATED,

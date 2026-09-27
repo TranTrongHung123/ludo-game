@@ -18,6 +18,7 @@ public record ReconnectResult(
         this(restored, presenceState, room, gameState, null);
     }
 
+    // Kết quả khôi phục chỉ được chứa dữ liệu đúng phòng và trận đã khôi phục.
     public ReconnectResult {
         Objects.requireNonNull(presenceState, "presenceState");
         if (!restored && (room != null || gameState != null || gameOver != null)) {

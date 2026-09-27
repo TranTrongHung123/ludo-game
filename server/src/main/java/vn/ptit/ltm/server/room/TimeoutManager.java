@@ -13,10 +13,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * Owns one scheduled turn timeout per room. GameRoom still validates the
- * expected state version, phase and player before applying a timeout.
- */
+// Mỗi phòng chỉ có một lịch timeout. GameRoom kiểm tra lại phiên bản, phase và người chơi trước khi áp dụng.
 final class TimeoutManager implements AutoCloseable {
     private static final Logger LOGGER = LoggerFactory.getLogger(TimeoutManager.class);
 
@@ -35,6 +32,7 @@ final class TimeoutManager implements AutoCloseable {
         });
     }
 
+    // Hủy lịch trước và cấp ticket mới để mỗi phòng chỉ còn một callback hợp lệ.
     void schedule(String roomId, long deadlineEpochMillis, Runnable callback) {
         Objects.requireNonNull(roomId, "roomId");
         Objects.requireNonNull(callback, "callback");
@@ -54,6 +52,7 @@ final class TimeoutManager implements AutoCloseable {
         }
     }
 
+    // Hủy lịch timeout khi phòng không còn phase cần chờ.
     void cancel(String roomId) {
         synchronized (lock) {
             ScheduledEntry entry = scheduledByRoom.remove(roomId);
@@ -63,6 +62,7 @@ final class TimeoutManager implements AutoCloseable {
         }
     }
 
+    // Bỏ callback có ticket cũ rồi chạy callback hợp lệ ngoài khóa lịch.
     private void runIfCurrent(String roomId, long ticket, Runnable callback) {
         synchronized (lock) {
             ScheduledEntry current = scheduledByRoom.get(roomId);
@@ -78,6 +78,7 @@ final class TimeoutManager implements AutoCloseable {
         }
     }
 
+    // Hủy mọi lịch và dừng luồng lập lịch khi Server đóng.
     @Override
     public void close() {
         synchronized (lock) {

@@ -14,6 +14,7 @@ public final class CompositeConnectionListener implements ConnectionListener {
         }
     }
 
+    // Chuyển sự kiện kết nối tới các bộ quản lý đã đăng ký.
     @Override
     public void onConnected(ClientConnection connection) {
         for (ConnectionListener listener : listeners) {
@@ -21,6 +22,7 @@ public final class CompositeConnectionListener implements ConnectionListener {
         }
     }
 
+    // Thông báo đóng connection cho các bộ quản lý để dọn trạng thái liên quan.
     @Override
     public void onDisconnected(ClientConnection connection) {
         RuntimeException firstFailure = null;

@@ -6,6 +6,7 @@ import vn.ptit.ltm.common.model.BoardCoordinates;
 import java.util.Objects;
 
 public record SpecialCellDto(int globalIndex, SpecialCellType type) {
+    // Chặn chỉ số ngoài bàn và các ô cấm đặt hiệu ứng.
     public SpecialCellDto {
         Objects.requireNonNull(type, "type");
         if (!BoardCoordinates.isSpecialCellAllowed(globalIndex)) {
