@@ -45,8 +45,4 @@ Maven chỉ build backend Java; client được build trong Unity Editor.
 
 Luật và contract đầy đủ nằm trong [SYSTEM.md](../SYSTEM.md).
 
-## Tài nguyên
 
-Font Liberation Sans và giấy phép OFL nằm trong `Assets/TextMesh Pro/Fonts/`.
-Các thông tin attribution đi kèm tài nguyên được giữ trong `Assets/`.
-Hình minh họa `Assets/Art/Login/ludo-pieces.png` được tạo bằng công cụ tạo ảnh AI; các hình nền và biểu tượng giao diện được tạo riêng cho dự án.
