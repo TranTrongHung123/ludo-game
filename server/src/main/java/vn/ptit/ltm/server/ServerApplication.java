@@ -19,6 +19,7 @@ import vn.ptit.ltm.server.service.MatchService;
 import vn.ptit.ltm.server.service.RankingService;
 import vn.ptit.ltm.server.session.SessionConnectionListener;
 import vn.ptit.ltm.server.session.SessionManager;
+import vn.ptit.ltm.server.voice.UdpVoiceServer;
 
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
@@ -28,12 +29,14 @@ public final class ServerApplication implements AutoCloseable {
     private static final Logger LOGGER = LoggerFactory.getLogger(ServerApplication.class);
     private static final int DEFAULT_PORT = 5555;
     private static final int DEFAULT_WORKER_THREADS = 32;
+    private static final int DEFAULT_VOICE_UDP_PORT = 5556;
 
     private final DatabaseManager databaseManager;
     private final SessionManager sessionManager;
     private final HeartbeatManager heartbeatManager;
     private final RoomService roomService;
     private final TcpServer tcpServer;
+    private final UdpVoiceServer voiceServer;
     private final CountDownLatch stopped = new CountDownLatch(1);
     private final AtomicBoolean closed = new AtomicBoolean();
 
@@ -42,13 +45,15 @@ public final class ServerApplication implements AutoCloseable {
             SessionManager sessionManager,
             HeartbeatManager heartbeatManager,
             RoomService roomService,
-            TcpServer tcpServer
+            TcpServer tcpServer,
+            UdpVoiceServer voiceServer
     ) {
         this.databaseManager = databaseManager;
         this.sessionManager = sessionManager;
         this.heartbeatManager = heartbeatManager;
         this.roomService = roomService;
         this.tcpServer = tcpServer;
+        this.voiceServer = voiceServer;
     }
 
     // Khởi tạo database và kết nối các dịch vụ phiên, phòng, heartbeat với TCP Server.
@@ -57,6 +62,7 @@ public final class ServerApplication implements AutoCloseable {
         SessionManager sessions = new SessionManager();
         HeartbeatManager heartbeat = new HeartbeatManager();
         RoomService rooms = null;
+        UdpVoiceServer voice = null;
         try {
             ConnectionRegistry connections = new ConnectionRegistry();
             LobbyService lobby = new LobbyService(sessions, connections);
@@ -65,6 +71,11 @@ public final class ServerApplication implements AutoCloseable {
             RankingService rankingService = new RankingService(matches);
             rooms = new RoomService(sessions, connections, matchService);
             RoomService activeRooms = rooms;
+            voice = new UdpVoiceServer(
+                    environmentInt("VOICE_UDP_PORT", DEFAULT_VOICE_UDP_PORT, 1, 65_535),
+                    activeRooms::isVoiceParticipant
+            );
+            UdpVoiceServer activeVoice = voice;
             sessions.addEventListener(lobby::broadcastOnlinePlayers);
             sessions.addEventListener(activeRooms::onSessionsChanged);
             AuthService authService = new AuthService(
@@ -80,7 +91,8 @@ public final class ServerApplication implements AutoCloseable {
                     lobby,
                     activeRooms,
                     matchService,
-                    rankingService
+                    rankingService,
+                    activeVoice
             );
             TcpServer server = new TcpServer(
                     environmentInt("SERVER_PORT", DEFAULT_PORT, 1, 65_535),
@@ -92,22 +104,26 @@ public final class ServerApplication implements AutoCloseable {
                             new SessionConnectionListener(sessions)
                     )
             );
-            return new ServerApplication(database, sessions, heartbeat, activeRooms, server);
-        } catch (RuntimeException exception) {
+            return new ServerApplication(database, sessions, heartbeat, activeRooms, server, activeVoice);
+        } catch (RuntimeException | IOException exception) {
+            if (voice != null) {
+                voice.close();
+            }
             if (rooms != null) {
                 rooms.close();
             }
             heartbeat.close();
             sessions.close();
             database.close();
-            throw exception;
+            throw new IllegalStateException("Unable to initialize server", exception);
         }
     }
 
     // Bắt đầu lắng nghe TCP sau khi các dịch vụ đã khởi tạo.
     public void start() throws IOException {
+        voiceServer.start();
         tcpServer.start();
-        LOGGER.info("Ludo Game Server started on port {}", tcpServer.port());
+        LOGGER.info("Ludo Game Server started on TCP {} and UDP voice {}", tcpServer.port(), voiceServer.port());
     }
 
     // Giữ tiến trình chính chờ tới khi Server được đóng.
@@ -122,6 +138,7 @@ public final class ServerApplication implements AutoCloseable {
             return;
         }
         tcpServer.close();
+        voiceServer.close();
         heartbeatManager.close();
         roomService.close();
         sessionManager.close();

@@ -20,6 +20,7 @@ import vn.ptit.ltm.common.dto.game.MovePieceRequest;
 import vn.ptit.ltm.common.dto.game.RollDiceRequest;
 import vn.ptit.ltm.common.dto.session.ReconnectRequest;
 import vn.ptit.ltm.common.dto.session.ReconnectResult;
+import vn.ptit.ltm.common.dto.voice.VoiceRegisterRequest;
 import vn.ptit.ltm.common.enums.MessageType;
 import vn.ptit.ltm.common.error.ErrorCode;
 import vn.ptit.ltm.common.protocol.JsonMessageCodec;
@@ -36,6 +37,7 @@ import vn.ptit.ltm.server.room.RoomService;
 import vn.ptit.ltm.server.session.PlayerSession;
 import vn.ptit.ltm.server.session.SessionManager;
 import vn.ptit.ltm.server.session.SessionStateProvider;
+import vn.ptit.ltm.server.voice.UdpVoiceServer;
 
 import java.io.IOException;
 import java.util.Objects;
@@ -51,6 +53,7 @@ public final class AuthMessageHandler implements MessageHandler {
     private final RoomService roomService;
     private final MatchService matchService;
     private final RankingService rankingService;
+    private final UdpVoiceServer voiceServer;
     private final PayloadMapper payloadMapper;
     private final MessageFactory messageFactory;
     private final RequestIdRegistry requestIds = new RequestIdRegistry();
@@ -61,7 +64,7 @@ public final class AuthMessageHandler implements MessageHandler {
             SessionStateProvider sessionStateProvider,
             HeartbeatManager heartbeatManager
     ) {
-        this(authService, sessionManager, sessionStateProvider, heartbeatManager, null, null, null, null);
+        this(authService, sessionManager, sessionStateProvider, heartbeatManager, null, null, null, null, null);
     }
 
     public AuthMessageHandler(
@@ -71,7 +74,7 @@ public final class AuthMessageHandler implements MessageHandler {
             HeartbeatManager heartbeatManager,
             LobbyService lobbyService
     ) {
-        this(authService, sessionManager, sessionStateProvider, heartbeatManager, lobbyService, null, null, null);
+        this(authService, sessionManager, sessionStateProvider, heartbeatManager, lobbyService, null, null, null, null);
     }
 
     public AuthMessageHandler(
@@ -90,6 +93,7 @@ public final class AuthMessageHandler implements MessageHandler {
                 lobbyService,
                 roomService,
                 null,
+                null,
                 null
         );
     }
@@ -104,6 +108,30 @@ public final class AuthMessageHandler implements MessageHandler {
             MatchService matchService,
             RankingService rankingService
     ) {
+        this(
+                authService,
+                sessionManager,
+                sessionStateProvider,
+                heartbeatManager,
+                lobbyService,
+                roomService,
+                matchService,
+                rankingService,
+                null
+        );
+    }
+
+    public AuthMessageHandler(
+            AuthService authService,
+            SessionManager sessionManager,
+            SessionStateProvider sessionStateProvider,
+            HeartbeatManager heartbeatManager,
+            LobbyService lobbyService,
+            RoomService roomService,
+            MatchService matchService,
+            RankingService rankingService,
+            UdpVoiceServer voiceServer
+    ) {
         this.authService = Objects.requireNonNull(authService, "authService");
         this.sessionManager = Objects.requireNonNull(sessionManager, "sessionManager");
         this.sessionStateProvider = Objects.requireNonNull(sessionStateProvider, "sessionStateProvider");
@@ -112,6 +140,7 @@ public final class AuthMessageHandler implements MessageHandler {
         this.roomService = roomService;
         this.matchService = matchService;
         this.rankingService = rankingService;
+        this.voiceServer = voiceServer;
         JsonMessageCodec codec = new JsonMessageCodec();
         this.payloadMapper = new PayloadMapper(codec.objectMapper());
         this.messageFactory = new MessageFactory(codec.objectMapper());
@@ -164,6 +193,7 @@ public final class AuthMessageHandler implements MessageHandler {
                 case ROLL_DICE -> handleRollDice(connection, message);
                 case MOVE_PIECE -> handleMovePiece(connection, message);
                 case CHAT_MESSAGE -> handleChatMessage(connection, message);
+                case VOICE_REGISTER -> handleVoiceRegister(connection, message);
                 default -> throw new AuthException(
                         ErrorCode.INVALID_REQUEST,
                         "Message type is not supported yet: " + message.type()
@@ -232,6 +262,9 @@ public final class AuthMessageHandler implements MessageHandler {
     // Xử lý rời phòng và hủy phiên khi người dùng đăng xuất.
     private void handleLogout(ClientConnection connection, MessageEnvelope message) throws IOException {
         PlayerSession session = sessionManager.requireAuthenticated(message.sessionId(), connection.id());
+        if (voiceServer != null) {
+            voiceServer.unregister(session.user().id());
+        }
         sessionManager.logout(message.sessionId(), connection.id());
         if (roomService != null) {
             roomService.leaveForSessionEnd(session.user().id());
@@ -333,7 +366,11 @@ public final class AuthMessageHandler implements MessageHandler {
             throws IOException {
         requireRoomService();
         LeaveRoomRequest request = payloadMapper.fromTree(message.data(), LeaveRoomRequest.class);
+        PlayerSession session = sessionManager.requireAuthenticated(message.sessionId(), connection.id());
         roomService.leaveRoom(message.sessionId(), connection.id(), request.roomId());
+        if (voiceServer != null) {
+            voiceServer.unregister(session.user().id());
+        }
         connection.send(messageFactory.response(
                 MessageType.LEAVE_ROOM,
                 message.requestId(),
@@ -501,6 +538,26 @@ public final class AuthMessageHandler implements MessageHandler {
                 chatMessage
         ));
         roomService.broadcastChatMessage(request.roomId(), chatMessage);
+    }
+
+    /** Cấp token UDP sau khi xác thực người gửi đang ở trong trận được yêu cầu. */
+    private void handleVoiceRegister(ClientConnection connection, MessageEnvelope message) throws IOException {
+        requireRoomService();
+        if (voiceServer == null) {
+            throw new AuthException(ErrorCode.INTERNAL_SERVER_ERROR, "Voice service is unavailable");
+        }
+        VoiceRegisterRequest request = payloadMapper.fromTree(message.data(), VoiceRegisterRequest.class);
+        int slotIndex = roomService.requireVoiceParticipant(
+                message.sessionId(),
+                connection.id(),
+                request.roomId()
+        );
+        PlayerSession session = sessionManager.requireAuthenticated(message.sessionId(), connection.id());
+        connection.send(messageFactory.response(
+                MessageType.VOICE_REGISTERED,
+                message.requestId(),
+                voiceServer.register(request.roomId(), session.user().id(), slotIndex)
+        ));
     }
 
     private void requireRoomService() {

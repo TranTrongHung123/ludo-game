@@ -38,6 +38,8 @@ Maven chỉ build backend Java; client được build trong Unity Editor.
 ## Kết nối và trạng thái
 
 - TCP dùng length prefix 4 byte big-endian, JSON UTF-8, tối đa 65.536 byte mỗi frame.
+- Voice chat dùng UDP do Server relay theo phòng: PCM16 mono 16 kHz, khung 20 ms. Token UDP được cấp qua TCP đã xác thực.
+- Trong trận, `MIC` điều khiển việc thu/gửi tiếng và `LOA` điều khiển phát tiếng người khác; hai trạng thái hoàn toàn độc lập.
 - `NetworkSession` giữ kết nối xuyên scene và cập nhật UI trên Unity main thread.
 - Client trả heartbeat và thử reconnect bằng session trong RAM khi mất kết nối.
 - Xúc xắc, nước đi hợp lệ, timer, điểm và kết quả đều lấy từ Server.

@@ -36,13 +36,13 @@ Tài liệu mô tả kiến trúc, chức năng, giao thức TCP, mô hình dữ
 | Đặng Phi Long   | B23DCCN497   | Sảnh, phòng, lời mời, chủ phòng và trạng thái phòng   |
 | Tạ Thanh Thiên  | B23DCCN783   | Bàn cờ, quân cờ, xúc xắc, lượt chơi và luật game      |
 
-Hệ thống phục vụ từ 2 đến 4 người chơi trong một phòng, mỗi người có 4 quân. Chức năng gồm đăng ký, đăng nhập, sảnh trực tuyến, quản lý phòng, lời mời, Ready, thi đấu, chat trong phòng, khôi phục kết nối, lưu kết quả, lịch sử trận và bảng xếp hạng.
+Hệ thống phục vụ từ 2 đến 4 người chơi trong một phòng, mỗi người có 4 quân. Chức năng gồm đăng ký, đăng nhập, sảnh trực tuyến, quản lý phòng, lời mời, Ready, thi đấu, chat chữ và voice chat UDP trong trận, khôi phục kết nối, lưu kết quả, lịch sử trận và bảng xếp hạng.
 
 ## 2. Kiến trúc và công nghệ
 
 ```text
 Unity Client 1 ─┐
-Unity Client 2 ─┼── TCP + length-prefixed UTF-8 JSON ── Java Game Server
+Unity Client 2 ─┼── TCP JSON + UDP voice ─────────────── Java Game Server
 Unity Client N ─┘                                           │
                                                    JDBC + HikariCP
                                                            │
@@ -214,6 +214,7 @@ Bộ enum được định nghĩa trong [MessageType.java](common/src/main/java/
 | Phòng             | `CREATE_ROOM`, `JOIN_ROOM`, `LEAVE_ROOM`, `INVITE_PLAYER`, `ACCEPT_INVITE`, `REJECT_INVITE`, `READY`, `UNREADY`, `START_GAME`, `ROOM_UPDATED`                  |
 | Gameplay          | `ROLL_DICE`, `DICE_RESULT`, `MOVE_PIECE`, `MOVE_PIECE_RESULT`, `GAME_STATE`, `GAME_STATE_UPDATED`, `TURN_STARTED`, `TURN_CHANGED`, `TURN_TIMEOUT`, `GAME_OVER` |
 | Chat              | `CHAT_MESSAGE`                                                                                                                                                 |
+| Voice chat        | `VOICE_REGISTER`, `VOICE_REGISTERED`                                                                                                                          |
 | Kết nối           | `PING`, `PONG`, `RECONNECT`, `RECONNECT_RESULT`                                                                                                                |
 | Lỗi               | `ERROR`                                                                                                                                                        |
 
@@ -387,6 +388,14 @@ Nút về sảnh gửi `LEAVE_ROOM` và chờ Server xác nhận. Thành viên �
 
 Client gửi `CHAT_MESSAGE`; Server xác thực membership và chuyển nội dung tới các thành viên cùng phòng. Chat không thay đổi luật hoặc Game State. Unity escape cả tên người gửi và nội dung trước khi đưa vào rich text, tránh diễn giải nội dung người dùng thành markup.
 
+### 13.3. Voice chat UDP
+
+Voice chỉ hoạt động khi `RoomState = PLAYING`. Client gửi `VOICE_REGISTER` qua TCP kèm `roomId`; Server xác thực session và membership rồi trả `VOICE_REGISTERED` gồm cổng UDP, token ngẫu nhiên 256 bit, sample rate, số kênh và kích thước frame. Token cũ của cùng người chơi bị vô hiệu khi đăng ký lại.
+
+Client gửi gói đăng ký/keep-alive UDP để bind token với địa chỉ nguồn. Âm thanh dùng PCM16 mono 16 kHz, mỗi frame 320 mẫu (20 ms). Server không giải mã âm thanh; nó kiểm tra magic, loại gói, token, endpoint, kích thước và trạng thái người chơi, sau đó relay tới các endpoint còn hiệu lực trong đúng phòng. Gói chuyển tiếp chứa `playerId` và sequence để client tách luồng người nói.
+
+Mic và loa độc lập: tắt mic dừng thu và gửi frame, còn tắt loa chỉ dừng phát cục bộ nhưng vẫn giữ keep-alive. Client trộn các luồng người nói sau jitter buffer ngắn. Rời trận, logout, mất quyền tham gia hoặc endpoint im lặng quá hạn làm token/endpoint không còn được relay. Server mặc định dùng UDP `5556`, cấu hình bằng `VOICE_UDP_PORT`.
+
 ## 14. Đồng bộ và trình diễn trên client
 
 ### 14.1. Network và vòng đời Unity
@@ -455,6 +464,7 @@ Log gồm connect/disconnect, login, phòng, game start, roll/move, timeout, rec
 | Lượt              | Dice 6 có/không có nước đi, bonus không cộng dồn, nhiều lần 6, slot trống, bỏ qua completed/forfeited                |
 | Timeout/reconnect | 120 giây mỗi phase, bỏ lượt, participant mất mạng vẫn có lượt, grace 60 giây, khôi phục snapshot/kết quả             |
 | TCP               | Frame phân mảnh/gộp, length sai/quá lớn, JSON lỗi, ngắt giữa frame, request trùng và action sai lượt                 |
+| UDP voice         | Token/endpoint sai, relay cùng phòng, cách ly khác phòng, keep-alive, mic/loa độc lập và gói PCM không hợp lệ       |
 | Phòng             | 2/3/4 người, join đồng thời, host rời, lời mời hết hạn/dùng lại, Ready/Start, chơi lại                               |
 | Persistence       | Transaction kết quả, retry không cộng điểm lặp, lịch sử và xếp hạng                                                  |
 | Client            | Chuyển scene, UI từ snapshot, chống phát lại animation, thoát trận, chat, nhiều client và mất kết nối                |

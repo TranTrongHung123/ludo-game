@@ -38,6 +38,9 @@ public enum MessageType {
 
     CHAT_MESSAGE,
 
+    VOICE_REGISTER,
+    VOICE_REGISTERED,
+
     PING,
     PONG,
     RECONNECT,

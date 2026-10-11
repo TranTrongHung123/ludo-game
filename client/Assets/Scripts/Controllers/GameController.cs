@@ -30,6 +30,8 @@ namespace Ludo.Controllers
         private long? awaitingStateVersion;
         private string lastCurrentPlayerId;
         private int lastCountdownSecond = -1;
+        private VoiceChatService voiceService;
+        private VoiceControlView voiceControls;
         private JObject Game => session?.GameState;
         private string SelfId => (string)session?.Profile?["playerId"];
         private JToken Self => (Game?["participants"] as JArray)?.FirstOrDefault(p => (string)p["playerId"] == SelfId);
@@ -52,6 +54,9 @@ namespace Ludo.Controllers
             session = NetworkSession.Instance;
             if (session?.SessionId == null) { Go("LoginScene"); return; }
             if (Game == null) { Go(session.Room == null ? "LobbyScene" : "RoomScene"); return; }
+            voiceService = VoiceChatService.EnsureInstance();
+            voiceControls = VoiceControlView.Create();
+            voiceControls?.Bind(voiceService);
             rollButton.onClick.AddListener(Roll); moveButton.onClick.AddListener(Move);
             leaveButton.onClick.AddListener(Leave); confirmButton.onClick.AddListener(ConfirmLeave);
             cancelButton.onClick.AddListener(() => { Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick); confirmation.SetActive(false); Render(); });
@@ -73,6 +78,10 @@ namespace Ludo.Controllers
         private void ConnectionChanged(ConnectionState state)
         {
             if (session.SessionId == null) { Go("LoginScene"); return; }
+            if (state == ConnectionState.Connected && Game != null)
+                _ = voiceService?.StartForMatchAsync(session, (string)Game["roomId"]);
+            else
+                voiceService?.StopMatch();
             snap = true;
             board.ResetPresentation();
             awaitingStateVersion = null;
@@ -320,6 +329,7 @@ namespace Ludo.Controllers
                 session.GameEvent -= Event;
                 session.ChatReceived -= OnChatReceived;
             }
+            voiceService?.StopMatch();
         }
     }
 }

@@ -19,12 +19,13 @@ Bài tập lớn môn **Lập trình mạng**, nhóm **1**, lớp **CT01**.
 - Sảnh trực tuyến; tạo, tham gia, mời người chơi và Ready trong phòng.
 - Thi đấu với 4 quân mỗi người, đá quân, ô đặc biệt và giới hạn thời gian mỗi phase.
 - Chat trong phòng, khôi phục kết nối và xử lý bỏ cuộc.
+- Voice chat UDP trong trận với nút bật/tắt mic và loa độc lập.
 - Kết quả trận, chơi lại cùng phòng, lịch sử và bảng xếp hạng.
 
 ## Kiến trúc và công nghệ
 
 ```text
-Unity Client ── TCP + length-prefixed UTF-8 JSON ── Java Server ── JDBC ── MySQL
+Unity Client ── TCP JSON + UDP voice ── Java Server ── JDBC ── MySQL
 ```
 
 | Thành phần         | Công nghệ                                                |

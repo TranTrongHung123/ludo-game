@@ -39,7 +39,7 @@ Compose chỉ publish MySQL trên loopback của máy host. Các client chơi qu
 
 Lệnh build `common` và `server` rồi chạy Server; giữ terminal mở. Dùng **Ctrl+C** để dừng.
 
-Server mặc định lắng nghe TCP `5555`, tạo HikariCP pool và chạy Flyway migration trước khi nhận request.
+Server mặc định lắng nghe TCP `5555` và voice chat UDP `5556`, tạo HikariCP pool và chạy Flyway migration trước khi nhận request.
 
 ## 4. Khởi động Unity Client
 
@@ -52,7 +52,7 @@ Client mặc định dùng `127.0.0.1:5555`. Đổi `Server Host` / `Server Port
 `NetworkSession` của LoginScene hoặc đặt `SERVER_HOST` / `SERVER_PORT` trước khi mở Editor/player.
 Editor đã chạy không nhận biến môi trường vừa đặt từ terminal khác.
 
-Chơi qua LAN: dùng IP máy Server cho `SERVER_HOST` trên các client và cho phép cổng TCP của Server qua firewall.
+Chơi qua LAN: dùng IP máy Server cho `SERVER_HOST` trên các client và cho phép cả TCP `5555` lẫn UDP `5556` qua firewall. Client nhận cổng voice từ Server sau khi trận bắt đầu.
 
 ### Build và chạy nhiều client
 
@@ -72,6 +72,7 @@ Có thể sao chép [.env.example](.env.example) thành `.env` để thay đổi
 | Biến Server                | Mặc định / ý nghĩa                                             |
 | -------------------------- | -------------------------------------------------------------- |
 | `SERVER_PORT`              | `5555`                                                         |
+| `VOICE_UDP_PORT`           | `5556`; voice chat PCM16 mono 16 kHz trong trận               |
 | `SERVER_WORKER_THREADS`    | `32`                                                           |
 | `DB_URL`                   | JDBC URL đầy đủ; ưu tiên hơn host/port/name                    |
 | `DB_HOST`                  | `localhost`                                                    |

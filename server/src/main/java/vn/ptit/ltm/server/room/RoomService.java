@@ -14,6 +14,7 @@ import vn.ptit.ltm.common.dto.game.MovePieceResultDto;
 import vn.ptit.ltm.common.dto.game.TurnTimeoutDto;
 import vn.ptit.ltm.common.enums.MessageType;
 import vn.ptit.ltm.common.enums.PlayerPresenceState;
+import vn.ptit.ltm.common.enums.RoomState;
 import vn.ptit.ltm.common.error.ErrorCode;
 import vn.ptit.ltm.common.model.GameConstants;
 import vn.ptit.ltm.common.protocol.JsonMessageCodec;
@@ -439,6 +440,28 @@ public final class RoomService implements AutoCloseable {
     public Optional<GameStateDto> gameForPlayer(long userId) {
         return roomManager.findByPlayer(userId)
                 .flatMap(room -> room.gameSnapshotIfStarted(presenceSnapshot()));
+    }
+
+    /** Xác thực phiên đang là thành viên kết nối trong một trận đang diễn ra. */
+    public int requireVoiceParticipant(String sessionId, String connectionId, String roomId) {
+        PlayerSession session = sessionManager.requireAuthenticated(sessionId, connectionId);
+        requireRoomId(roomId);
+        GameRoom room = roomManager.requireRoomForPlayer(roomId, session.user().id());
+        if (snapshot(room).state() != RoomState.PLAYING) {
+            throw new RoomException(ErrorCode.INVALID_GAME_STATE, "Voice chat is only available during a match");
+        }
+        return room.memberInfo(session.user().id()).slotIndex();
+    }
+
+    /** Được UDP relay gọi lại để loại token ngay khi người chơi rời trận hoặc mất phiên. */
+    public boolean isVoiceParticipant(String roomId, long userId) {
+        return sessionManager.findByUserId(userId)
+                .filter(PlayerSession::connected)
+                .filter(session -> session.presenceState() == PlayerPresenceState.PLAYING)
+                .flatMap(session -> roomManager.findByPlayer(userId))
+                .filter(room -> room.roomId().equals(roomId))
+                .map(room -> snapshot(room).state() == RoomState.PLAYING)
+                .orElse(false);
     }
 
     // Gửi trạng thái phòng tới các thành viên còn kết nối.

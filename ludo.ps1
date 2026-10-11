@@ -52,7 +52,7 @@ try {
         "server" {
             Write-Host "Dang build Server..."
             Invoke-Maven "-q" "-pl" "server" "-am" "-DskipTests" "install"
-            Write-Host "Game Server dang chay tai 127.0.0.1:5555 (Ctrl+C de dung)."
+            Write-Host "Game Server: TCP 127.0.0.1:5555, voice UDP 127.0.0.1:5556 (Ctrl+C de dung)."
             Invoke-Maven "-pl" "server" "exec:java"
         }
         "build" {
