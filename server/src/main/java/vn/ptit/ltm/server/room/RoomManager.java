@@ -4,31 +4,49 @@ import vn.ptit.ltm.common.error.ErrorCode;
 import vn.ptit.ltm.server.session.PlayerSession;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Supplier;
 
 final class RoomManager {
     private final ConcurrentMap<String, GameRoom> roomsById = new ConcurrentHashMap<>();
     private final ConcurrentMap<Long, String> roomIdByUserId = new ConcurrentHashMap<>();
+    private final Supplier<String> roomCodeGenerator;
+
+    RoomManager() {
+        this(PublicCode::roomId);
+    }
+
+    RoomManager(Supplier<String> roomCodeGenerator) {
+        this.roomCodeGenerator = roomCodeGenerator;
+    }
 
     // Đăng ký phòng mới và ánh xạ người tạo tới phòng đó.
     GameRoom create(PlayerSession creator) {
         long userId = creator.user().id();
-        String roomId = UUID.randomUUID().toString();
-        GameRoom room = new GameRoom(roomId, creator);
-        roomsById.put(roomId, room);
-        String existingRoomId = roomIdByUserId.putIfAbsent(userId, roomId);
-        if (existingRoomId != null) {
-            roomsById.remove(roomId, room);
+        if (roomIdByUserId.containsKey(userId)) {
             throw new RoomException(ErrorCode.ALREADY_IN_ROOM, "Player is already in a room");
         }
-        return room;
+        for (int attempt = 0; attempt < 128; attempt++) {
+            String roomId = roomCodeGenerator.get();
+            GameRoom room = new GameRoom(roomId, creator);
+            // Reserve atomically: a collision must never overwrite another live room.
+            if (roomsById.putIfAbsent(roomId, room) != null) continue;
+            String existingRoomId = roomIdByUserId.putIfAbsent(userId, roomId);
+            if (existingRoomId != null) {
+                roomsById.remove(roomId, room);
+                throw new RoomException(ErrorCode.ALREADY_IN_ROOM, "Player is already in a room");
+            }
+            return room;
+        }
+        throw new RoomException(ErrorCode.INTERNAL_SERVER_ERROR, "Unable to allocate a room code. Please retry.");
     }
 
     // Cập nhật ánh xạ membership cùng việc thêm người vào phòng.
     GameRoom join(String roomId, PlayerSession player) {
+        roomId = roomId.trim().toUpperCase(Locale.ROOT);
         GameRoom room = roomsById.get(roomId);
         if (room == null) {
             throw new RoomException(ErrorCode.ROOM_NOT_FOUND, "Room does not exist");

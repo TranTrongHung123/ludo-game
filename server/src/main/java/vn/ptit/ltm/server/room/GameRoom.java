@@ -39,7 +39,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.UUID;
 
 final class GameRoom {
     private final String roomId;
@@ -220,7 +219,7 @@ final class GameRoom {
             persistedGameOver = null;
             gameState = new GameStateDto(
                     roomId,
-                    UUID.randomUUID().toString(),
+                    PublicCode.matchId(),
                     RoomState.PLAYING,
                     Long.toString(first.userId()),
                     first.slotIndex(),

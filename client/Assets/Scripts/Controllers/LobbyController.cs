@@ -121,7 +121,7 @@ namespace Ludo.Controllers
         public void JoinRoom()
         {
             if (!Available()) return;
-            string code = roomCode.text.Trim();
+            string code = roomCode.text.Trim().ToUpperInvariant();
             if (code.Length == 0) { Notice("Vui lòng nhập mã phòng.", true); return; }
             Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.ButtonClick);
             _ = RoomAction("JOIN_ROOM", code);

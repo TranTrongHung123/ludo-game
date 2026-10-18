@@ -55,7 +55,7 @@ namespace Ludo.Controllers
             if (session?.SessionId == null) { Go("LoginScene"); return; }
             if (Game == null) { Go(session.Room == null ? "LobbyScene" : "RoomScene"); return; }
             voiceService = VoiceChatService.EnsureInstance();
-            voiceControls = VoiceControlView.Create();
+            voiceControls = VoiceControlView.Create(leaveButton.transform.parent);
             voiceControls?.Bind(voiceService);
             rollButton.onClick.AddListener(Roll); moveButton.onClick.AddListener(Move);
             leaveButton.onClick.AddListener(Leave); confirmButton.onClick.AddListener(ConfirmLeave);
