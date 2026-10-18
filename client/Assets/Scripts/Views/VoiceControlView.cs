@@ -9,13 +9,13 @@ namespace Ludo.Views
     /// <summary>Cụm nút tròn điều khiển loa và microphone trong trận đấu.</summary>
     public sealed class VoiceControlView : MonoBehaviour
     {
-        private static readonly Color32 EnabledBackground = new Color32(25, 71, 68, 244);
-        private static readonly Color32 DisabledBackground = new Color32(35, 49, 58, 238);
-        private static readonly Color32 UnavailableBackground = new Color32(52, 56, 62, 205);
-        private static readonly Color32 EnabledIcon = new Color32(226, 255, 247, 255);
-        private static readonly Color32 DisabledIcon = new Color32(190, 201, 205, 255);
-        private static readonly Color32 EnabledAccent = new Color32(75, 222, 166, 255);
-        private static readonly Color32 DisabledAccent = new Color32(244, 111, 111, 255);
+        private static readonly Color32 EnabledBackground = new Color32(243, 238, 251, 255);
+        private static readonly Color32 DisabledBackground = new Color32(253, 234, 240, 255);
+        private static readonly Color32 UnavailableBackground = new Color32(237, 233, 242, 255);
+        private static readonly Color32 EnabledIcon = new Color32(94, 53, 177, 255);
+        private static readonly Color32 DisabledIcon = new Color32(161, 64, 94, 255);
+        private static readonly Color32 EnabledAccent = new Color32(53, 167, 134, 255);
+        private static readonly Color32 DisabledAccent = new Color32(206, 88, 116, 255);
 
         private readonly List<Object> generatedAssets = new List<Object>();
 
@@ -38,13 +38,12 @@ namespace Ludo.Views
         private Sprite speakerOnSprite;
         private Sprite speakerOffSprite;
 
-        public static VoiceControlView Create()
+        public static VoiceControlView Create(Transform parent)
         {
-            Canvas canvas = FindAnyObjectByType<Canvas>();
-            if (canvas == null) return null;
+            if (parent == null) return null;
 
             var root = new GameObject("VoiceControls", typeof(RectTransform));
-            root.transform.SetParent(canvas.transform, false);
+            root.transform.SetParent(parent, false);
             root.transform.SetAsLastSibling();
             var view = root.AddComponent<VoiceControlView>();
             view.Build();
@@ -64,15 +63,15 @@ namespace Ludo.Views
             CreateSprites();
 
             var rect = GetComponent<RectTransform>();
-            rect.anchorMin = new Vector2(1f, 1f);
-            rect.anchorMax = new Vector2(1f, 1f);
-            rect.pivot = new Vector2(1f, 1f);
-            rect.anchoredPosition = new Vector2(-26f, -54f);
-            rect.sizeDelta = new Vector2(72f, 154f);
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.anchoredPosition = new Vector2(1436f, -44f);
+            rect.sizeDelta = new Vector2(120f, 54f);
 
             speakerButton = CreateRoundButton(
                 "SpeakerButton",
-                new Vector2(-4f, -4f),
+                Vector2.zero,
                 speakerOnSprite,
                 out speakerBackground,
                 out speakerIcon,
@@ -81,7 +80,7 @@ namespace Ludo.Views
 
             micButton = CreateRoundButton(
                 "MicrophoneButton",
-                new Vector2(-4f, -76f),
+                new Vector2(66f, 0f),
                 microphoneOffSprite,
                 out micBackground,
                 out micIcon,
@@ -101,15 +100,15 @@ namespace Ludo.Views
             statusRect.anchorMin = new Vector2(1f, 1f);
             statusRect.anchorMax = new Vector2(1f, 1f);
             statusRect.pivot = new Vector2(1f, 1f);
-            statusRect.anchoredPosition = new Vector2(0f, -142f);
-            statusRect.sizeDelta = new Vector2(170f, 20f);
+            statusRect.anchoredPosition = new Vector2(0f, -60f);
+            statusRect.sizeDelta = new Vector2(180f, 20f);
 
             statusLabel = statusObject.GetComponent<TextMeshProUGUI>();
             TMP_FontAsset font = Resources.Load<TMP_FontAsset>("Fonts/Ludo Vietnamese SDF");
             if (font != null) statusLabel.font = font;
             statusLabel.fontSize = 10.5f;
             statusLabel.fontStyle = FontStyles.Bold;
-            statusLabel.color = new Color32(226, 232, 234, 230);
+            statusLabel.color = new Color32(117, 102, 143, 255);
             statusLabel.alignment = TextAlignmentOptions.Right;
             statusLabel.textWrappingMode = TextWrappingModes.NoWrap;
             statusLabel.overflowMode = TextOverflowModes.Ellipsis;
@@ -136,11 +135,11 @@ namespace Ludo.Views
             buttonObject.transform.SetParent(transform, false);
 
             var rect = buttonObject.GetComponent<RectTransform>();
-            rect.anchorMin = new Vector2(1f, 1f);
-            rect.anchorMax = new Vector2(1f, 1f);
-            rect.pivot = new Vector2(1f, 1f);
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
             rect.anchoredPosition = position;
-            rect.sizeDelta = new Vector2(62f, 62f);
+            rect.sizeDelta = new Vector2(54f, 54f);
 
             background = buttonObject.GetComponent<Image>();
             background.sprite = circleSprite;
@@ -148,13 +147,13 @@ namespace Ludo.Views
             background.type = Image.Type.Simple;
 
             var shadow = buttonObject.GetComponent<Shadow>();
-            shadow.effectColor = new Color(0f, 0f, 0f, 0.42f);
-            shadow.effectDistance = new Vector2(0f, -3f);
+            shadow.effectColor = new Color32(92, 65, 136, 24);
+            shadow.effectDistance = new Vector2(0f, -2f);
             shadow.useGraphicAlpha = true;
 
             outline = buttonObject.GetComponent<Outline>();
-            outline.effectColor = new Color(0.52f, 0.62f, 0.64f, 0.42f);
-            outline.effectDistance = new Vector2(1.5f, 1.5f);
+            outline.effectColor = new Color32(218, 207, 238, 200);
+            outline.effectDistance = new Vector2(1f, 1f);
             outline.useGraphicAlpha = true;
 
             var button = buttonObject.GetComponent<Button>();
@@ -167,7 +166,7 @@ namespace Ludo.Views
                 highlightedColor = new Color(1.08f, 1.08f, 1.08f, 1f),
                 pressedColor = new Color(0.76f, 0.79f, 0.8f, 1f),
                 selectedColor = Color.white,
-                disabledColor = new Color(0.62f, 0.62f, 0.62f, 0.72f),
+                disabledColor = Color.white,
                 colorMultiplier = 1f,
                 fadeDuration = 0.08f
             };
@@ -179,7 +178,7 @@ namespace Ludo.Views
             iconRect.anchorMax = new Vector2(0.5f, 0.5f);
             iconRect.pivot = new Vector2(0.5f, 0.5f);
             iconRect.anchoredPosition = Vector2.zero;
-            iconRect.sizeDelta = new Vector2(38f, 38f);
+            iconRect.sizeDelta = new Vector2(30f, 30f);
             icon = iconObject.GetComponent<Image>();
             icon.sprite = initialIcon;
             icon.color = DisabledIcon;
@@ -233,7 +232,7 @@ namespace Ludo.Views
             {
                 case VoiceConnectionState.Connecting:
                     statusLabel.text = "ĐANG KẾT NỐI THOẠI...";
-                    statusLabel.color = new Color32(255, 207, 110, 240);
+                    statusLabel.color = new Color32(145, 98, 21, 255);
                     break;
                 case VoiceConnectionState.Failed:
                     statusLabel.text = "LỖI KẾT NỐI THOẠI";
@@ -241,7 +240,7 @@ namespace Ludo.Views
                     break;
                 case VoiceConnectionState.Stopped:
                     statusLabel.text = "THOẠI CHƯA KẾT NỐI";
-                    statusLabel.color = new Color32(190, 201, 205, 220);
+                    statusLabel.color = new Color32(117, 102, 143, 255);
                     break;
                 default:
                     statusLabel.text = string.Empty;
@@ -264,9 +263,9 @@ namespace Ludo.Views
             if (!connected)
             {
                 background.color = UnavailableBackground;
-                icon.color = new Color32(155, 163, 167, 210);
-                stateDot.color = new Color32(119, 126, 130, 220);
-                outline.effectColor = new Color(0.45f, 0.48f, 0.5f, 0.28f);
+                icon.color = new Color32(139, 128, 154, 255);
+                stateDot.color = new Color32(159, 149, 171, 255);
+                outline.effectColor = new Color32(218, 210, 229, 200);
                 return;
             }
 
@@ -274,8 +273,8 @@ namespace Ludo.Views
             icon.color = enabled ? EnabledIcon : DisabledIcon;
             stateDot.color = enabled ? EnabledAccent : DisabledAccent;
             outline.effectColor = enabled
-                ? new Color(0.29f, 0.87f, 0.65f, 0.7f)
-                : new Color(0.55f, 0.64f, 0.66f, 0.42f);
+                ? new Color32(218, 207, 238, 200)
+                : new Color32(240, 202, 214, 220);
         }
 
         private void CreateSprites()

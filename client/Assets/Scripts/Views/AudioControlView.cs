@@ -11,6 +11,9 @@ namespace Ludo.Views
 {
     public sealed class AudioControlView : MonoBehaviour
     {
+        private static readonly Vector2 AudioButtonSize = new Vector2(126f, 54f);
+        private const float PanelGap = 12f;
+
         private Canvas canvas;
         private CanvasScaler scaler;
         private GraphicRaycaster raycaster;
@@ -324,7 +327,7 @@ namespace Ludo.Views
             buttonRect.anchorMin = new Vector2(1, 1);
             buttonRect.anchorMax = new Vector2(1, 1);
             buttonRect.pivot = new Vector2(1, 1);
-            buttonRect.sizeDelta = new Vector2(132, 36);
+            buttonRect.sizeDelta = AudioButtonSize;
             buttonRect.anchoredPosition = new Vector2(-40, -16);
 
             buttonBackground = btnGo.GetComponent<Image>();
@@ -586,67 +589,53 @@ namespace Ludo.Views
         {
             if (buttonRect == null || panelRect == null) return;
 
-            buttonRect.anchorMin = new Vector2(1, 1);
-            buttonRect.anchorMax = new Vector2(1, 1);
             buttonRect.pivot = new Vector2(1, 1);
-
-            panelRect.anchorMin = new Vector2(1, 1);
-            panelRect.anchorMax = new Vector2(1, 1);
             panelRect.pivot = new Vector2(1, 1);
+            buttonRect.sizeDelta = AudioButtonSize;
+
+            // Các màn nội dung cố định dùng cùng điểm neo giữa như Content.
+            // Login/Register dùng Content kéo giãn nên neo theo góc màn hình.
+            Vector2 anchor = new Vector2(0.5f, 0.5f);
+            Vector2 position;
 
             switch (sceneName)
             {
                 case "GameScene":
-                    // Trong GameScene, LeaveButton nằm ở X: 1710..1872, Y: -44..-98, StatusFrame ở Y: -44..-89.
-                    // Đặt AudioButton ở dải trên (Y: -6..-38) tại X: -215 để vừa < -200f (tránh LeaveButton),
-                    // vừa hoàn toàn nằm phía trên StatusFrame và LeaveButton mà không đè lên bất kỳ phần tử nào.
-                    buttonRect.anchoredPosition = new Vector2(-215, -6);
-                    buttonRect.sizeDelta = new Vector2(130, 32);
-                    panelRect.anchoredPosition = new Vector2(-215, -44);
+                    // Cùng hàng với kết nối, loa, mic và Bỏ cuộc.
+                    position = new Vector2(734, 496);
                     break;
 
                 case "RoomScene":
-                    // Trong RoomScene, Rời phòng (LeaveButton) nằm ở Y: -86..-150, X: 1600..1810.
-                    // Đặt AudioButton ở góc trên bên phải (X: -40, Y: -18), chiều cao 36px (đáy -54).
-                    // Cách đỉnh của nút Rời phòng tới 32px khoảng trống, hoàn toàn không bị che hay xung đột.
-                    buttonRect.anchoredPosition = new Vector2(-40, -18);
-                    buttonRect.sizeDelta = new Vector2(132, 36);
-                    panelRect.anchoredPosition = new Vector2(-40, -60);
+                    // Phía trên Rời phòng, thẳng mép phải với nội dung.
+                    position = new Vector2(850, 522);
                     break;
 
                 case "LobbyScene":
-                    // Trong LobbyScene, Header card màu trắng nằm ở Y: -66..-194.
-                    // Đặt AudioButton ở dải trên màn hình (X: -40, Y: -14), đáy ở -50.
-                    // Cách mép trên của Header card 16px, không chạm vào card và không đè nút Đăng xuất.
-                    buttonRect.anchoredPosition = new Vector2(-40, -14);
-                    buttonRect.sizeDelta = new Vector2(132, 36);
-                    panelRect.anchoredPosition = new Vector2(-40, -56);
+                    // Dải trống phía trên Header, tránh trạng thái và Đăng xuất.
+                    position = new Vector2(850, 534);
                     break;
 
                 case "RankingScene":
                 case "HistoryScene":
-                    // Trong RankingScene và HistoryScene, ConnectionBadge nằm ở Y: -48..-100.
-                    // Đặt AudioButton ở Y: -8 (đáy -42), nằm phía trên ConnectionBadge.
-                    buttonRect.anchoredPosition = new Vector2(-40, -8);
-                    buttonRect.sizeDelta = new Vector2(132, 34);
-                    panelRect.anchoredPosition = new Vector2(-40, -48);
+                    // Cùng hàng, cách bên trái ConnectionBadge 20px.
+                    position = new Vector2(454, 493);
                     break;
 
                 case "ResultScene":
-                    // Trong ResultScene, SyncBadge nằm ở Y: -45..-95.
-                    // Đặt AudioButton ở Y: -6 (đáy -40), nằm phía trên SyncBadge.
-                    buttonRect.anchoredPosition = new Vector2(-40, -6);
-                    buttonRect.sizeDelta = new Vector2(132, 34);
-                    panelRect.anchoredPosition = new Vector2(-40, -46);
+                    // Cùng hàng, cách bên trái SyncBadge 20px.
+                    position = new Vector2(430, 497);
                     break;
 
                 default:
-                    // LoginScene, RegisterScene hoặc các màn hình khác (góc trên phải hoàn toàn tự do)
-                    buttonRect.anchoredPosition = new Vector2(-40, -18);
-                    buttonRect.sizeDelta = new Vector2(132, 36);
-                    panelRect.anchoredPosition = new Vector2(-40, -60);
+                    anchor = new Vector2(1, 1);
+                    position = new Vector2(-40, -18);
                     break;
             }
+
+            buttonRect.anchorMin = buttonRect.anchorMax = anchor;
+            panelRect.anchorMin = panelRect.anchorMax = anchor;
+            buttonRect.anchoredPosition = position;
+            panelRect.anchoredPosition = position + new Vector2(0f, -AudioButtonSize.y - PanelGap);
         }
 
         // Đóng hoặc mở bảng và đồng bộ giá trị điều khiển khi hiển thị.

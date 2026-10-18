@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Ludo.Services;
 using Newtonsoft.Json.Linq;
 using TMPro;
 using UnityEngine;
@@ -19,6 +20,7 @@ namespace Ludo.Views
         [SerializeField] private BoardNotice notice;
         private long renderedVersion = -1;
         private string renderedMatch;
+        private readonly string[] yardPlayerIds = new string[4];
         public bool IsAnimating => pieces.Values.Any(piece => piece != null && piece.IsAnimating);
         public bool HasNotice => notice != null && notice.Visible;
         // Dừng animation và xóa lịch sử vị trí khi đổi trận hoặc khôi phục kết nối.
@@ -27,17 +29,32 @@ namespace Ludo.Views
             foreach (var piece in pieces.Values) if (piece != null) piece.Snap();
             if (notice != null) notice.Clear();
             previousSteps.Clear();
+            Array.Clear(yardPlayerIds, 0, yardPlayerIds.Length);
             initialized = false;
         }
         private int ownSlot = -1;
-        // Nhấn màu vùng bãi của người chơi bằng thời gian không phụ thuộc tốc độ game.
+        // Giữ dấu chuồng của bạn và nháy khung chuồng của bất kỳ người nào đang nói.
         private void Update()
         {
-            if (ownSlot < 0 || ownSlot >= ownYardHighlights.Length) return;
-            var tint = Color.Lerp(BoardGeometry.Tints[ownSlot], Color.black,
-                .16f + .04f * Mathf.Sin(Time.unscaledTime * 3f));
-            tint.a = 1f;
-            ownYardHighlights[ownSlot].color = tint;
+            UpdateYardHighlights();
+        }
+
+        private void UpdateYardHighlights()
+        {
+            var voice = VoiceChatService.Instance;
+            for (int slot = 0; slot < ownYardHighlights.Length; slot++)
+            {
+                var highlight = ownYardHighlights[slot];
+                if (highlight == null) continue;
+                bool speaking = slot < yardPlayerIds.Length && voice != null && voice.IsSpeaking(yardPlayerIds[slot]);
+                highlight.gameObject.SetActive(slot == ownSlot || speaking);
+                float pulse = .5f + .5f * Mathf.Sin(Time.unscaledTime * 12f);
+                var tint = speaking
+                    ? Color.Lerp(BoardGeometry.Tints[slot], Color.white, .1f + .65f * pulse)
+                    : Color.Lerp(BoardGeometry.Tints[slot], Color.black, .16f + .04f * Mathf.Sin(Time.unscaledTime * 3f));
+                tint.a = 1f;
+                highlight.color = tint;
+            }
         }
         private readonly Dictionary<string, PieceView> pieces = new Dictionary<string, PieceView>();
         private readonly Dictionary<string, int> previousSteps = new Dictionary<string, int>();
@@ -55,11 +72,19 @@ namespace Ludo.Views
             for (int i = 0; i < cells.Length; i++) cells[i].text = i % 12 == 0 ? new[]{"→", "↓", "←", "↑"}[i / 12] : "";
             if (bonusRollIcons != null) foreach (var icon in bonusRollIcons) if (icon != null) icon.SetActive(false);
             ownSlot = BoardGeometry.Slot((string)(state["participants"] as JArray)?.FirstOrDefault(p => (string)p["playerId"] == self)?["color"]);
+            Array.Clear(yardPlayerIds, 0, yardPlayerIds.Length);
+            foreach (var participant in state["participants"] as JArray ?? new JArray())
+            {
+                int slot = BoardGeometry.Slot((string)participant["color"]);
+                if (slot >= 0 && (string)participant["matchStatus"] == "ACTIVE"
+                    && (string)participant["presenceState"] != "DISCONNECTED")
+                    yardPlayerIds[slot] = (string)participant["playerId"];
+            }
             for (int i = 0; i < ownYardHighlights.Length; i++)
             {
-                ownYardHighlights[i].gameObject.SetActive(i == ownSlot);
                 yardNames[i].text = BoardGeometry.Names[i].ToUpperInvariant() + (i == ownSlot ? " • BẠN" : "");
             }
+            UpdateYardHighlights();
             foreach (var cell in state["specialCells"] as JArray ?? new JArray())
             {
                 int index = (int?)cell["globalIndex"] ?? -1;

@@ -25,6 +25,8 @@ namespace Ludo.Services
         private const int ClientHeaderBytes = 41;
         private const int ServerHeaderBytes = 17;
         private const int MaxQueuedSamples = 32000;
+        private const double SpeakingMeanSquareThreshold = 0.000144; // RMS 0.012, khoảng -38 dBFS.
+        private static readonly long SpeakingHoldTicks = System.Diagnostics.Stopwatch.Frequency / 4;
 
         public static VoiceChatService Instance { get; private set; }
         public VoiceConnectionState State { get; private set; } = VoiceConnectionState.Stopped;
@@ -35,6 +37,8 @@ namespace Ludo.Services
 
         private readonly ConcurrentQueue<Action> mainThread = new ConcurrentQueue<Action>();
         private readonly ConcurrentDictionary<long, SpeakerBuffer> speakers = new ConcurrentDictionary<long, SpeakerBuffer>();
+        private readonly ConcurrentDictionary<long, long> speakingUntil = new ConcurrentDictionary<long, long>();
+        private long localPlayerId;
         private readonly object socketLock = new object();
         private Socket socket;
         private Thread receiveThread;
@@ -84,6 +88,7 @@ namespace Ludo.Services
             int attempt = ++generation;
             StopMicrophone();
             StopTransport();
+            long.TryParse((string)session.Profile?["playerId"], out localPlayerId);
             SetState(VoiceConnectionState.Connecting, "Đang kết nối thoại...");
             try
             {
@@ -124,7 +129,23 @@ namespace Ludo.Services
             micEnabled = false;
             StopMicrophone();
             StopTransport();
+            localPlayerId = 0;
             SetState(VoiceConnectionState.Stopped, "Thoại chưa kết nối");
+        }
+
+        // Dùng đồng hồ đơn điệu để cả luồng nhận UDP và UI đọc trạng thái an toàn.
+        public bool IsSpeaking(string playerId)
+        {
+            if (State != VoiceConnectionState.Connected || !long.TryParse(playerId, out long id)) return false;
+            if (id == localPlayerId && !micEnabled) return false;
+            return speakingUntil.TryGetValue(id, out long until)
+                && System.Diagnostics.Stopwatch.GetTimestamp() < until;
+        }
+
+        private void RecordVoiceActivity(long playerId, double meanSquare)
+        {
+            if (playerId <= 0 || meanSquare < SpeakingMeanSquareThreshold) return;
+            speakingUntil[playerId] = System.Diagnostics.Stopwatch.GetTimestamp() + SpeakingHoldTicks;
         }
 
         public void ToggleMic()
@@ -244,12 +265,15 @@ namespace Ludo.Services
             Buffer.BlockCopy(token, 0, packet, 5, TokenBytes);
             WriteInt32(packet, 37, sequence++);
             int offset = ClientHeaderBytes;
+            double energy = 0;
             for (int i = 0; i < samples.Length; i++)
             {
+                energy += samples[i] * samples[i];
                 short pcm = (short)Mathf.RoundToInt(Mathf.Clamp(samples[i], -1f, 1f) * 32767f);
                 packet[offset++] = (byte)(pcm >> 8);
                 packet[offset++] = (byte)pcm;
             }
+            if (samples.Length > 0) RecordVoiceActivity(localPlayerId, energy / samples.Length);
             TrySend(() => active.Send(packet));
         }
 
@@ -271,6 +295,7 @@ namespace Ludo.Services
                 while (receiving && attempt == generation)
                 {
                     int length = active.Receive(buffer);
+                    if (attempt != generation) return;
                     if (length < 5 || ReadInt32(buffer, 0) != Magic) continue;
                     if (buffer[4] == ServerRegistered && length == 5)
                     {
@@ -284,19 +309,30 @@ namespace Ludo.Services
                     }
                     if (buffer[4] != ServerAudio || length <= ServerHeaderBytes || ((length - ServerHeaderBytes) & 1) != 0)
                         continue;
-                    // Không giữ âm thanh cũ khi loa đang tắt; bật lại chỉ nghe dữ liệu mới.
-                    if (!speakerEnabled) continue;
-                    long senderId = ReadInt64(buffer, 5);
-                    SpeakerBuffer speaker = speakers.GetOrAdd(senderId, _ => new SpeakerBuffer(frameSamples));
-                    for (int offset = ServerHeaderBytes; offset + 1 < length; offset += 2)
-                    {
-                        short pcm = (short)((buffer[offset] << 8) | buffer[offset + 1]);
-                        speaker.Enqueue(pcm / 32768f);
-                    }
+                    ProcessAudioPacket(buffer, length);
                 }
             }
             catch (SocketException) { }
             catch (ObjectDisposedException) { }
+        }
+
+        private void ProcessAudioPacket(byte[] buffer, int length)
+        {
+            long senderId = ReadInt64(buffer, 5);
+            // Vẫn chỉ báo người nói khi tắt loa, nhưng không giữ âm thanh để phát lại.
+            SpeakerBuffer speaker = speakerEnabled
+                ? speakers.GetOrAdd(senderId, _ => new SpeakerBuffer(frameSamples)) : null;
+            double energy = 0;
+            int count = 0;
+            for (int offset = ServerHeaderBytes; offset + 1 < length; offset += 2)
+            {
+                short pcm = (short)((buffer[offset] << 8) | buffer[offset + 1]);
+                float sample = pcm / 32768f;
+                energy += sample * sample;
+                count++;
+                speaker?.Enqueue(sample);
+            }
+            if (count > 0) RecordVoiceActivity(senderId, energy / count);
         }
 
         private void FillPlayback(float[] data)
@@ -317,6 +353,7 @@ namespace Ludo.Services
 
         private void StopMicrophone()
         {
+            speakingUntil.TryRemove(localPlayerId, out _);
             if (microphoneClip != null && Microphone.IsRecording(microphoneDevice))
                 Microphone.End(microphoneDevice);
             microphoneClip = null;
@@ -335,6 +372,7 @@ namespace Ludo.Services
             receiveThread = null;
             token = null;
             ClearSpeakerBuffers();
+            speakingUntil.Clear();
         }
 
         private void ClearSpeakerBuffers()

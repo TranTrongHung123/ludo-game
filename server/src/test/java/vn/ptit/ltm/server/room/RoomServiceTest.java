@@ -43,6 +43,7 @@ class RoomServiceTest {
             RoomService rooms = new RoomService(sessions, new ConnectionRegistry());
 
             var created = rooms.createRoom(host.sessionId(), host.connectionId());
+            assertTrue(created.roomId().matches("[A-HJ-NP-Z2-9]{6}"));
             assertEquals("1", created.hostPlayerId());
             assertEquals(PieceColor.RED, created.players().getFirst().color());
             RoomException duplicate = assertThrows(
@@ -390,6 +391,8 @@ class RoomServiceTest {
             assertTrue(readyRoom.players().stream().allMatch(player -> player.ready()));
 
             var game = rooms.startGame(host.sessionId(), host.connectionId(), room.roomId());
+            assertTrue(game.matchId().matches("[A-HJ-NP-Z2-9]{12}"));
+            assertEquals(room.roomId(), game.roomId());
             assertEquals(vn.ptit.ltm.common.enums.RoomState.PLAYING, game.roomState());
             assertEquals("1", game.currentPlayerId());
             assertEquals(0, game.currentSlot());
