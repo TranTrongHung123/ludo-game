@@ -79,6 +79,3 @@ Quy tắc đầy đủ, hệ điểm và contract được mô tả trong [SYSTE
 - [RUN.md](RUN.md): hướng dẫn cài đặt, vận hành và kiểm thử.
 - [client/README.md](client/README.md): cấu trúc và sử dụng Unity Client.
 
-## Demo
-
-[Xem video demo đầy đủ](demo/video.mp4)
