@@ -15,6 +15,8 @@ namespace Ludo.Controllers
         [SerializeField] private TMP_Text roomLabel, matchLabel, connection, turnName, phase, timer, diceLabel, feedback, selection, leaveLabel;
         [SerializeField] private UnityEngine.UI.Button rollButton, moveButton, leaveButton, confirmButton, cancelButton;
         [SerializeField] private UnityEngine.UI.Image timerFill;
+        [SerializeField] private UnityEngine.UI.Image turnBackground;
+        private Color defaultTurnBackgroundColor;
         [SerializeField] private GameObject confirmation;
         [SerializeField] private BoardView board;
         [SerializeField] private DiceView dice;
@@ -50,6 +52,7 @@ namespace Ludo.Controllers
         // Gắn các sự kiện gameplay và điều hướng nếu không có phiên hoặc trận hợp lệ.
         private void Start()
         {
+            if (turnBackground != null) defaultTurnBackgroundColor = turnBackground.color;
             AudioManager.EnsureInstance();
             session = NetworkSession.Instance;
             if (session?.SessionId == null) { Go("LoginScene"); return; }
@@ -102,6 +105,11 @@ namespace Ludo.Controllers
             matchLabel.text = "Trận " + (string)Game["matchId"];
             var members = Game["participants"] as JArray ?? new JArray();
             string current = (string)Game["currentPlayerId"];
+            var currentPlayer = members.FirstOrDefault(p => (string)p["playerId"] == current);
+            int currentSlot = (int?)currentPlayer?["slotIndex"] ?? -1;
+            if (turnBackground != null)
+                turnBackground.color = (string)Game["turnState"] != "FINISHED" && currentSlot >= 0 && currentSlot < BoardGeometry.Tints.Length
+                    ? Color.Lerp(Color.white, BoardGeometry.Tints[currentSlot], .25f) : defaultTurnBackgroundColor;
             if (current == SelfId && lastCurrentPlayerId != SelfId && (string)Game["turnState"] != "FINISHED")
             {
                 Ludo.Services.AudioManager.Instance?.PlaySfx(Ludo.Services.SfxClip.TurnStart);

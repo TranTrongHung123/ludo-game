@@ -24,18 +24,6 @@ Tài liệu mô tả kiến trúc, chức năng, giao thức TCP, mô hình dữ
 
 ## 1. Thông tin và phạm vi
 
-- **Môn học:** Lập trình mạng.
-- **Đề tài:** Xây dựng game Cờ Cá Ngựa.
-- **Lớp:** D23CTPM01 — nhóm lớp CT01 — nhóm BTL 1.
-- **Năm:** 2026.
-
-| Thành viên      | Mã sinh viên | Phạm vi phụ trách                                     |
-| --------------- | ------------ | ----------------------------------------------------- |
-| Hoàng Đình Duy  | B23DCCN237   | Tài khoản, cơ sở dữ liệu, điểm, lịch sử và xếp hạng   |
-| Trần Trọng Hùng | B23DCCN363   | TCP, protocol, session, đồng bộ, timeout và reconnect |
-| Đặng Phi Long   | B23DCCN497   | Sảnh, phòng, lời mời, chủ phòng và trạng thái phòng   |
-| Tạ Thanh Thiên  | B23DCCN783   | Bàn cờ, quân cờ, xúc xắc, lượt chơi và luật game      |
-
 Hệ thống phục vụ từ 2 đến 4 người chơi trong một phòng, mỗi người có 4 quân. Chức năng gồm đăng ký, đăng nhập, sảnh trực tuyến, quản lý phòng, lời mời, Ready, thi đấu, chat chữ và voice chat UDP trong trận, khôi phục kết nối, lưu kết quả, lịch sử trận và bảng xếp hạng.
 
 ## 2. Kiến trúc và công nghệ
@@ -214,7 +202,7 @@ Bộ enum được định nghĩa trong [MessageType.java](common/src/main/java/
 | Phòng             | `CREATE_ROOM`, `JOIN_ROOM`, `LEAVE_ROOM`, `INVITE_PLAYER`, `ACCEPT_INVITE`, `REJECT_INVITE`, `READY`, `UNREADY`, `START_GAME`, `ROOM_UPDATED`                  |
 | Gameplay          | `ROLL_DICE`, `DICE_RESULT`, `MOVE_PIECE`, `MOVE_PIECE_RESULT`, `GAME_STATE`, `GAME_STATE_UPDATED`, `TURN_STARTED`, `TURN_CHANGED`, `TURN_TIMEOUT`, `GAME_OVER` |
 | Chat              | `CHAT_MESSAGE`                                                                                                                                                 |
-| Voice chat        | `VOICE_REGISTER`, `VOICE_REGISTERED`                                                                                                                          |
+| Voice chat        | `VOICE_REGISTER`, `VOICE_REGISTERED`                                                                                                                           |
 | Kết nối           | `PING`, `PONG`, `RECONNECT`, `RECONNECT_RESULT`                                                                                                                |
 | Lỗi               | `ERROR`                                                                                                                                                        |
 
@@ -464,7 +452,7 @@ Log gồm connect/disconnect, login, phòng, game start, roll/move, timeout, rec
 | Lượt              | Dice 6 có/không có nước đi, bonus không cộng dồn, nhiều lần 6, slot trống, bỏ qua completed/forfeited                |
 | Timeout/reconnect | 120 giây mỗi phase, bỏ lượt, participant mất mạng vẫn có lượt, grace 60 giây, khôi phục snapshot/kết quả             |
 | TCP               | Frame phân mảnh/gộp, length sai/quá lớn, JSON lỗi, ngắt giữa frame, request trùng và action sai lượt                 |
-| UDP voice         | Token/endpoint sai, relay cùng phòng, cách ly khác phòng, keep-alive, mic/loa độc lập và gói PCM không hợp lệ       |
+| UDP voice         | Token/endpoint sai, relay cùng phòng, cách ly khác phòng, keep-alive, mic/loa độc lập và gói PCM không hợp lệ        |
 | Phòng             | 2/3/4 người, join đồng thời, host rời, lời mời hết hạn/dùng lại, Ready/Start, chơi lại                               |
 | Persistence       | Transaction kết quả, retry không cộng điểm lặp, lịch sử và xếp hạng                                                  |
 | Client            | Chuyển scene, UI từ snapshot, chống phát lại animation, thoát trận, chat, nhiều client và mất kết nối                |

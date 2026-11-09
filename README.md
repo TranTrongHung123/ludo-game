@@ -4,15 +4,6 @@ Bài tập lớn môn **Lập trình mạng**, nhóm **1**, lớp **CT01**.
 
 **Đề tài**: Game Cờ Cá Ngựa cho **2 – 4 người chơi** theo mô hình Client–Server.
 
-## Thành viên
-
-| Thành viên      | Mã sinh viên |
-| --------------- | ------------ |
-| Trần Trọng Hùng | B23DCCN363   |
-| Hoàng Đình Duy  | B23DCCN237   |
-| Đặng Phi Long   | B23DCCN497   |
-| Tạ Thanh Thiên  | B23DCCN783   |
-
 ## Chức năng
 
 - Đăng ký, đăng nhập và quản lý phiên tài khoản.
@@ -87,3 +78,7 @@ Quy tắc đầy đủ, hệ điểm và contract được mô tả trong [SYSTE
 - [SYSTEM.md](SYSTEM.md): đặc tả hệ thống.
 - [RUN.md](RUN.md): hướng dẫn cài đặt, vận hành và kiểm thử.
 - [client/README.md](client/README.md): cấu trúc và sử dụng Unity Client.
+
+## Demo
+
+[Xem video demo đầy đủ](demo/video.mp4)
